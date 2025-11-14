@@ -44,7 +44,7 @@ def ppo_evaluate_with_rendering(config):
             obs, info = env.reset()
 
     env.close()
-def ppo_train_with_parameters(config, train_time_step, is_rendering_on, train_log_handler):
+def ppo_train_with_parameters(config, train_time_step, is_rendering_on, train_log_handler, use_ver1_0=False, wandb_config=None):
     seed = 1234
     np.random.seed(seed)
 
@@ -60,7 +60,7 @@ def ppo_train_with_parameters(config, train_time_step, is_rendering_on, train_lo
     with open(os.path.join(log_dir, 'session_config.json'), 'w', encoding='utf-8') as file:
         json.dump(session_config_dict, file, ensure_ascii=False, indent=4)
 
-    custom_callback = EnvironmentHandler.get_callback(config, train_log_handler)
+    custom_callback = EnvironmentHandler.get_callback(config, train_log_handler, use_ver1_0=use_ver1_0, wandb_config=wandb_config)
 
 
     model.learn(reset_num_timesteps=False, total_timesteps=train_time_step, log_interval=1, callback=custom_callback, progress_bar=True)
@@ -73,6 +73,11 @@ if __name__ == '__main__':
     parser.add_argument("--config_file_path", type=str, default="", help="path to train config file")
     parser.add_argument("--flag_rendering", type=bool, default=False, action=argparse.BooleanOptionalAction, help="rendering(True/False)")
     parser.add_argument("--flag_realtime_evaluate", type=bool, default=False, action=argparse.BooleanOptionalAction, help="realtime evaluate(True/False)")
+    
+    # ver1_0 options
+    parser.add_argument("--use_ver1_0", type=bool, default=False, action=argparse.BooleanOptionalAction, help="Use ver1_0 callback with WandB (True/False)")
+    parser.add_argument("--wandb_project", type=str, default="myoassist-imitation", help="WandB project name")
+    parser.add_argument("--wandb_name", type=str, default=None, help="WandB run name")
 
     args, unknown_args = parser.parse_known_args()
     if args.config_file_path is None:
@@ -92,6 +97,20 @@ if __name__ == '__main__':
     log_dir = os.path.join("rl_train","results", f"train_session_{datetime.now().strftime('%Y%m%d-%H%M%S')}")
     os.makedirs(log_dir, exist_ok=True)
     train_log_handler = train_log_handler.TrainLogHandler(log_dir)
+    
+    # Prepare WandB config if ver1_0 is enabled
+    wandb_config = None
+    if args.use_ver1_0:
+        wandb_config = {
+            'project': args.wandb_project,
+            'name': args.wandb_name or f"train_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            'config': {
+                'model_type': '3D' if '3D' in config.env_params.model_path else '2D',
+                'total_timesteps': config.total_timesteps,
+            },
+            'tags': ['ver1_0', 'imitation'],
+        }
+        print(f"\n✅ ver1_0 mode enabled with WandB: {wandb_config['project']}/{wandb_config['name']}\n")
 
     if args.flag_realtime_evaluate:
         ppo_evaluate_with_rendering(config)
@@ -99,5 +118,7 @@ if __name__ == '__main__':
         ppo_train_with_parameters(config,
                                 train_time_step=config.total_timesteps,
                                 is_rendering_on=args.flag_rendering,
-                                train_log_handler=train_log_handler)
+                                train_log_handler=train_log_handler,
+                                use_ver1_0=args.use_ver1_0,
+                                wandb_config=wandb_config)
     
