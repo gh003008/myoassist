@@ -53,7 +53,7 @@
             "end_effector_imitation_reward": 0.0
         },
         "env_id": "myoAssistLegImitationExo-v0",
-        "num_envs": 12,
+        "num_envs": 8,
         "seed": 1234,
         "safe_height": 0.7,
         "control_framerate": 30,
@@ -372,7 +372,7 @@
         "use_sde": false,
         "sde_sample_freq": -1,
         "target_kl": 0.01,
-        "device": "cpu"
+        "device": "cuda"
     },
     "auto_reward_adjust_params": {
         "learning_rate": 0.0
