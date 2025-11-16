@@ -18,7 +18,7 @@ CONFIG = {
     'output_dir': r'C:\workspace_home\myoassist\rl_train\reference_data',
     'output_name': 'S004_trial01_08mps_3D_HDF5_v7',
     
-    # HDF5 = OpenSim, Model = OpenSim → DIRECT MAPPING (NO coordinate transform!)
+    # HDF5 = OpenSim, Model = OpenSim ??DIRECT MAPPING (NO coordinate transform!)
     # Use RELATIVE positions (centered at 0) like NPZ data
     # FIXED: pelvis rotation order now matches MuJoCo qpos order (tilt, list, rotation)
     
@@ -28,36 +28,36 @@ CONFIG = {
 }
 
 # ============================================================================
-# HDF5 → MyoAssist joint mapping
+# HDF5 ??MyoAssist joint mapping
 # ============================================================================
 # MyoAssist joint order (3D model with full DOF)
 # CRITICAL: Order must match MuJoCo model qpos indices!
 # MuJoCo model has: qpos[3]=pelvis_tilt, qpos[4]=pelvis_list
 MYOASSIST_JOINTS = [
-    'q_pelvis_tx',        # 0 → qpos[0] - Right (X)
-    'q_pelvis_ty',        # 1 → qpos[1] - Up (Y)
-    'q_pelvis_tz',        # 2 → qpos[2] - Forward (Z)
-    'q_pelvis_tilt',      # 3 → qpos[3] - Pitch (forward/back tilt)
-    'q_pelvis_list',      # 4 → qpos[4] - Roll (side lean)
-    'q_pelvis_rotation',  # 5 → qpos[5] - Yaw (twist)
-    'hip_flexion_r',      # 6 → qpos[6]
-    'hip_adduction_r',    # 7 → qpos[7]
-    'hip_rotation_r',     # 8 → qpos[8]
-    'hip_flexion_l',      # 9 → qpos[23]
-    'hip_adduction_l',    # 10 → qpos[24]
-    'hip_rotation_l',     # 11 → qpos[25]
-    'knee_angle_r',       # 12 → qpos[11]
-    'knee_angle_l',       # 13 → qpos[28]
-    'ankle_angle_r',      # 14 → qpos[12]
-    'ankle_angle_l',      # 15 → qpos[29]
+    'q_pelvis_tx',        # 0 ??qpos[0] - Right (X)
+    'q_pelvis_ty',        # 1 ??qpos[1] - Up (Y)
+    'q_pelvis_tz',        # 2 ??qpos[2] - Forward (Z)
+    'q_pelvis_tilt',      # 3 ??qpos[3] - Pitch (forward/back tilt)
+    'q_pelvis_list',      # 4 ??qpos[4] - Roll (side lean)
+    'q_pelvis_rotation',  # 5 ??qpos[5] - Yaw (twist)
+    'q_hip_flexion_r',    # 6 ??qpos[6]
+    'q_hip_adduction_r',  # 7 ??qpos[7]
+    'q_hip_rotation_r',   # 8 ??qpos[8]
+    'q_hip_flexion_l',    # 9 ??qpos[23]
+    'q_hip_adduction_l',  # 10 ??qpos[24]
+    'q_hip_rotation_l',   # 11 ??qpos[25]
+    'q_knee_angle_r',     # 12 ??qpos[11]
+    'q_knee_angle_l',     # 13 ??qpos[28]
+    'q_ankle_angle_r',    # 14 ??qpos[12]
+    'q_ankle_angle_l',    # 15 ??qpos[29]
 ]
 
 def load_hdf5_data(hdf5_path, subject, speed, trial):
     """Load motion data from HDF5 file
     
     IMPORTANT: HDF5 has mixed units!
-    - Joint angles (hip, knee, ankle, pelvis rotations): DEGREES → convert to radians
-    - Translations (pelvis_tx, pelvis_ty, pelvis_tz): METERS → keep as-is
+    - Joint angles (hip, knee, ankle, pelvis rotations): DEGREES ??convert to radians
+    - Translations (pelvis_tx, pelvis_ty, pelvis_tz): METERS ??keep as-is
     """
     print(f'Loading HDF5: {hdf5_path}')
     
@@ -115,14 +115,14 @@ def convert_to_myoassist(hdf5_data, config):
     pelvis_ty_mean = np.mean(hdf5_data['pelvis_ty'])
     pelvis_tz_mean = np.mean(hdf5_data['pelvis_tz'])
     
-    series_data['q_pelvis_tx'] = hdf5_data['pelvis_tx'] - pelvis_tx_mean  # Right (relative)
-    series_data['q_pelvis_ty'] = hdf5_data['pelvis_ty'] - pelvis_ty_mean  # Up (relative)
-    series_data['q_pelvis_tz'] = hdf5_data['pelvis_tz'] - pelvis_tz_mean  # Forward (relative)
+    series_data['pelvis_tx'] = hdf5_data['pelvis_tx'] - pelvis_tx_mean  # Right (relative)
+    series_data['pelvis_ty'] = hdf5_data['pelvis_ty'] - pelvis_ty_mean  # Up (relative)
+    series_data['pelvis_tz'] = hdf5_data['pelvis_tz'] - pelvis_tz_mean  # Forward (relative)
     
     print(f'\nPelvis translation (converted to RELATIVE):')
-    print(f'  TX (right):   [{series_data["q_pelvis_tx"].min():8.4f}, {series_data["q_pelvis_tx"].max():8.4f}] m (mean subtracted: {pelvis_tx_mean:.4f})')
-    print(f'  TY (up):      [{series_data["q_pelvis_ty"].min():8.4f}, {series_data["q_pelvis_ty"].max():8.4f}] m (mean subtracted: {pelvis_ty_mean:.4f})')
-    print(f'  TZ (forward): [{series_data["q_pelvis_tz"].min():8.4f}, {series_data["q_pelvis_tz"].max():8.4f}] m (mean subtracted: {pelvis_tz_mean:.4f})')
+    print(f'  TX (right):   [{series_data["pelvis_tx"].min():8.4f}, {series_data["pelvis_tx"].max():8.4f}] m (mean subtracted: {pelvis_tx_mean:.4f})')
+    print(f'  TY (up):      [{series_data["pelvis_ty"].min():8.4f}, {series_data["pelvis_ty"].max():8.4f}] m (mean subtracted: {pelvis_ty_mean:.4f})')
+    print(f'  TZ (forward): [{series_data["pelvis_tz"].min():8.4f}, {series_data["pelvis_tz"].max():8.4f}] m (mean subtracted: {pelvis_tz_mean:.4f})')
     
     # ========================================================================
     # Pelvis Rotations - DIRECT MAPPING (OpenSim = MuJoCo coordinate system)
@@ -130,17 +130,18 @@ def convert_to_myoassist(hdf5_data, config):
     tilt_offset_rad = np.radians(config.get('tilt_offset_deg', 0.0))
     
     # CRITICAL: Match MuJoCo qpos order! qpos[3]=tilt, qpos[4]=list
-    series_data['q_pelvis_tilt'] = hdf5_data['pelvis_tilt'] + tilt_offset_rad  # Direct: forward/back tilt + offset
-    series_data['q_pelvis_list'] = hdf5_data['pelvis_list']  # Direct: side lean
-    series_data['q_pelvis_rotation'] = hdf5_data['pelvis_rotation']  # Direct: twist
+    series_data['pelvis_tilt'] = hdf5_data['pelvis_tilt'] + tilt_offset_rad  # Direct: forward/back tilt + offset
+    series_data['pelvis_list'] = hdf5_data['pelvis_list']  # Direct: side lean
+    series_data['pelvis_rotation'] = hdf5_data['pelvis_rotation']  # Direct: twist
     
     print(f'\nPelvis rotation ranges (DIRECT mapping, no swaps):')
-    print(f'  tilt:     [{np.degrees(series_data["q_pelvis_tilt"].min()):+.1f}, {np.degrees(series_data["q_pelvis_tilt"].max()):+.1f}] deg (offset={config.get("tilt_offset_deg", 0.0)}deg)')
-    print(f'  list:     [{np.degrees(series_data["q_pelvis_list"].min()):+.1f}, {np.degrees(series_data["q_pelvis_list"].max()):+.1f}] deg')
-    print(f'  rotation: [{np.degrees(series_data["q_pelvis_rotation"].min()):+.1f}, {np.degrees(series_data["q_pelvis_rotation"].max()):+.1f}] deg')
+    print(f'  tilt:     [{np.degrees(series_data["pelvis_tilt"].min()):+.1f}, {np.degrees(series_data["pelvis_tilt"].max()):+.1f}] deg (offset={config.get("tilt_offset_deg", 0.0)}deg)')
+    print(f'  list:     [{np.degrees(series_data["pelvis_list"].min()):+.1f}, {np.degrees(series_data["pelvis_list"].max()):+.1f}] deg')
+    print(f'  rotation: [{np.degrees(series_data["pelvis_rotation"].min()):+.1f}, {np.degrees(series_data["pelvis_rotation"].max()):+.1f}] deg')
     
     # ========================================================================
     # Hip joints - DIRECT MAPPING (OpenSim names = MuJoCo names)
+    # Add 'q_' prefix for consistency with training pipeline
     # ========================================================================
     series_data['hip_flexion_r'] = hdf5_data['hip_flexion_r']
     series_data['hip_adduction_r'] = hdf5_data['hip_adduction_r']
@@ -157,6 +158,7 @@ def convert_to_myoassist(hdf5_data, config):
     
     # ========================================================================
     # Knee and Ankle - DIRECT MAPPING
+    # Add 'q_' prefix for consistency
     # ========================================================================
     series_data['knee_angle_r'] = hdf5_data['knee_angle_r']
     series_data['knee_angle_l'] = hdf5_data['knee_angle_l']
@@ -168,30 +170,70 @@ def convert_to_myoassist(hdf5_data, config):
     print(f'  ankle_angle_r: [{series_data["ankle_angle_r"].min():+.3f}, {series_data["ankle_angle_r"].max():+.3f}]')
     
     # ========================================================================
+    # Compute velocities (dq) via numerical differentiation
+    # ========================================================================
+    dt = 0.01  # 100 Hz sampling rate
+    
+    # Calculate velocities for all position data
+    for key in list(series_data.keys()):
+        # Use central differences for better accuracy
+        dq = np.gradient(series_data[key], dt)
+        series_data[f'd{key}'] = dq  # Will become 'dq_pelvis_tx', etc. after prefix addition
+    
+    print(f'\n✅ Computed velocities for {len(series_data)//2} position channels')
+    
+    # ========================================================================
     # Assemble final array in MyoAssist order
     # ========================================================================
     q_ref = np.zeros((n_frames, len(MYOASSIST_JOINTS)))
     
     for i, joint_name in enumerate(MYOASSIST_JOINTS):
-        if joint_name in series_data:
-            q_ref[:, i] = series_data[joint_name]
+        # Remove 'q_' prefix to match series_data keys
+        key = joint_name[2:] if joint_name.startswith('q_') else joint_name
+        if key in series_data:
+            q_ref[:, i] = series_data[key]
         else:
             print(f'WARNING: {joint_name} not found in converted data!')
     
     return q_ref, series_data
 
-def save_myoassist_format(q_ref, config):
-    """Save in MyoAssist NPZ format"""
+def save_myoassist_format(q_ref, series_data, config):
+    """Save in MyoAssist NPZ format compatible with training pipeline"""
     
     output_path = os.path.join(config['output_dir'], f"{config['output_name']}.npz")
     
     # Create output directory if needed
     os.makedirs(config['output_dir'], exist_ok=True)
     
-    # Save
+    # Create metadata (required by training pipeline)
+    metadata = {
+        'sample_rate': 100.0,
+        'duration': q_ref.shape[0] / 100.0,
+        'num_frames': q_ref.shape[0],
+        'num_dof': q_ref.shape[1],
+        'source': 'HDF5_direct_v7',
+        'subject': config['subject'],
+        'motion_type': f"level_{config['speed']}",
+        'trial': config['trial']
+    }
+    
+    # Environment expects series_data keys with proper prefixes:
+    # - Position: 'q_pelvis_tx', 'q_hip_flexion_r', etc.
+    # - Velocity: 'dq_pelvis_tx', 'dq_hip_flexion_r', etc.
+    series_data_with_prefix = {}
+    for key, value in series_data.items():
+        if key.startswith('d'):  # velocity (dpelvis_tx -> dq_pelvis_tx)
+            new_key = f'd{key[1:]}'  # Strip 'd', will add back below
+            series_data_with_prefix[f'dq_{key[1:]}'] = value
+        else:  # position (pelvis_tx -> q_pelvis_tx)
+            series_data_with_prefix[f'q_{key}'] = value
+    
+    # Save with complete structure for training compatibility
     np.savez(
         output_path,
         q_ref=q_ref,
+        series_data=series_data_with_prefix,
+        metadata=metadata,
         joint_names=MYOASSIST_JOINTS,
         num_dof=q_ref.shape[1],
         sampling_rate=100.0,
@@ -203,10 +245,11 @@ def save_myoassist_format(q_ref, config):
     print(f'  DOF: {q_ref.shape[1]}')
     print(f'  Frames: {q_ref.shape[0]}')
     print(f'  Duration: {q_ref.shape[0]/100.0:.2f} sec')
+    print(f'  Metadata: {metadata}')
 
 def main():
     print('='*80)
-    print('HDF5 → MyoAssist Direct Converter')
+    print('HDF5 ??MyoAssist Direct Converter')
     print('='*80)
     
     # Load
@@ -222,7 +265,7 @@ def main():
     q_ref, series_data = convert_to_myoassist(hdf5_data, CONFIG)
     
     # Save
-    save_myoassist_format(q_ref, CONFIG)
+    save_myoassist_format(q_ref, series_data, CONFIG)
     
     print('\n' + '='*80)
     print('DONE')

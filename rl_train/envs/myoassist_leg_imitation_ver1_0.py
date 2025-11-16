@@ -103,6 +103,20 @@ class ImitationCustomLearningCallback_ver1_0(BaseCustomLearningCallback):
                 for key, value in rwd_dict.items():
                     wandb_log[f"reward/{key}"] = value
                 
+                # Log PPO training metrics if available
+                if hasattr(self.model, 'logger') and self.model.logger:
+                    logger_data = self.model.logger.name_to_value
+                    if logger_data:  # Check if logger has data
+                        wandb_log.update({
+                            "train/value_loss": logger_data.get("train/value_loss", 0),
+                            "train/policy_gradient_loss": logger_data.get("train/policy_gradient_loss", 0),
+                            "train/entropy_loss": logger_data.get("train/entropy_loss", 0),
+                            "train/approx_kl": logger_data.get("train/approx_kl", 0),
+                            "train/clip_fraction": logger_data.get("train/clip_fraction", 0),
+                            "train/learning_rate": logger_data.get("train/learning_rate", 0),
+                            "train/explained_variance": logger_data.get("train/explained_variance", 0),
+                        })
+                
                 try:
                     wandb.log(wandb_log, step=self.num_timesteps, commit=True)
                 except Exception as e:
@@ -156,17 +170,45 @@ class ImitationCustomLearningCallback_ver1_0(BaseCustomLearningCallback):
         episode_reward = 0
         frames = []
         
+        # 비디오 녹화 준비
+        try:
+            import imageio
+            video_enabled = True
+            print("📹 비디오 녹화 활성화")
+        except ImportError:
+            video_enabled = False
+            print("⚠️ imageio 없음 - 비디오 저장 건너뜀")
+        
         for step in range(self._config.evaluate_param_list[0]["num_timesteps"]):
             action, _states = eval_model.predict(obs, deterministic=True)
             obs, reward, done, truncated, info = eval_env.step(action)
             episode_reward += reward
             
-            # 프레임 캡처 (MuJoCo 렌더러가 자동으로 처리)
+            # 프레임 캡처 (2프레임마다, 30Hz → 15fps)
+            if video_enabled and step % 2 == 0:
+                try:
+                    frame = eval_env.render()
+                    if frame is not None:
+                        frames.append(frame)
+                except Exception as e:
+                    if step == 0:
+                        print(f"⚠️ 프레임 캡처 실패: {e}")
+                        video_enabled = False
             
             if truncated or done:
                 episode_rewards.append(episode_reward)
                 episode_reward = 0
                 obs, info = eval_env.reset()
+        
+        # 비디오 저장
+        if video_enabled and len(frames) > 0:
+            video_path = os.path.join(eval_dir, "evaluation.mp4")
+            print(f"💾 비디오 저장 중... ({len(frames)} 프레임)")
+            try:
+                imageio.mimsave(video_path, frames, fps=15)
+                print(f"🎬 비디오 저장 완료: {video_path}")
+            except Exception as e:
+                print(f"⚠️ 비디오 저장 실패: {e}")
         
         eval_env.close()
         
