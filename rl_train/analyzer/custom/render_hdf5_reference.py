@@ -136,8 +136,9 @@ def render_reference_motion(npz_path, model_path, output_path, num_frames=300, h
     # Setup renderer with better visualization options
     if multiview:
         # Multiview: side-by-side rendering (front + side)
-        renderer = mujoco.Renderer(model, height=720, width=2560)  # 1280x2 for side-by-side
-        print(f'\n🎥 Renderer: 2560x720 (Front + Side views side-by-side)')
+        # Use smaller resolution to fit within framebuffer limits
+        renderer = mujoco.Renderer(model, height=720, width=1920)  # Max framebuffer width
+        print(f'\n🎥 Renderer: 1920x720 (Front + Side views side-by-side)')
     else:
         renderer = mujoco.Renderer(model, height=720, width=1280)
         print(f'\n🎥 Renderer: 1280x720 (Diagonal view only)')
@@ -247,17 +248,17 @@ def render_reference_motion(npz_path, model_path, output_path, num_frames=300, h
         
         # Render with multiview or single view
         if multiview:
-            # Render front view (left half)
+            # Render front view (left half: 960px)
             renderer.update_scene(data_mj, camera=camera_front, scene_option=scene_option)
             pixels_front = renderer.render()
-            front_half = pixels_front[:, :1280]  # Left 1280 pixels
+            front_half = pixels_front[:, :960]  # Left 960 pixels
             
-            # Render side view (right half)
+            # Render side view (right half: 960px)
             renderer.update_scene(data_mj, camera=camera_side, scene_option=scene_option)
             pixels_side = renderer.render()
-            side_half = pixels_side[:, :1280]  # Left 1280 pixels
+            side_half = pixels_side[:, :960]  # Left 960 pixels
             
-            # Concatenate horizontally
+            # Concatenate horizontally (960 + 960 = 1920)
             pixels = np.concatenate([front_half, side_half], axis=1)
         else:
             # Single diagonal view
