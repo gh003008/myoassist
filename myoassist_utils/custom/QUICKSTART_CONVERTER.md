@@ -43,6 +43,16 @@ rl_train/reference_data/
 └── S004_trial01_08mps_3D_HDF5_v7.npz  # ← 이 파일 생성됨
 ```
 
+### 5단계: 시각화 (선택사항)
+
+변환이 제대로 되었는지 비디오로 확인:
+```bash
+python rl_train/analyzer/custom/render_hdf5_reference.py \
+    --data S004_trial01_08mps_3D_HDF5_v7
+```
+
+→ `ref_S004_trial01_08mps_3D_HDF5_v7.mp4` 비디오 생성됨
+
 ---
 
 ## ✅ 성공 확인

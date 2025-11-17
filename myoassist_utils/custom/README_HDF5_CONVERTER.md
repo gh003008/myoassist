@@ -220,6 +220,85 @@ python rl_train/analyzer/custom/render_hdf5_reference.py
 
 ---
 
+## 🎥 변환 결과 시각화 (비디오 생성)
+
+변환이 제대로 되었는지 확인하기 위해 reference motion을 비디오로 렌더링할 수 있습니다.
+
+### 사용 방법
+
+```bash
+# 기본 사용 (기본 설정으로 비디오 생성)
+python rl_train/analyzer/custom/render_hdf5_reference.py \
+    --data S004_trial01_08mps_3D_HDF5_v7
+
+# 상세 옵션 지정
+python rl_train/analyzer/custom/render_hdf5_reference.py \
+    --data S004_trial01_08mps_3D_HDF5_v7 \
+    --model models/26muscle_3D/myoLeg26_BASELINE.xml \
+    --frames 300 \
+    --output my_reference_video.mp4 \
+    --height 0.95
+```
+
+### 옵션 설명
+
+- `--data`: NPZ 파일 이름 또는 경로 (기본: `S004_trial01_08mps_3D_HDF5_v1`)
+- `--model`: MuJoCo 모델 XML 경로 (기본: `myoLeg26_TUTORIAL.xml`)
+- `--frames`: 렌더링할 프레임 수 (기본: 300)
+- `--output`: 출력 비디오 파일명 (기본: `ref_{npz_name}.mp4`)
+- `--height`: 모델을 들어올릴 높이 (기본: 0.95m)
+
+### 출력 예시
+
+```
+Loading reference: rl_train/reference_data/S004_trial01_08mps_3D_HDF5_v7.npz
+  Frames: 250
+  DOF: 16
+  Height offset: 0.950 m
+
+Loading model: models/26muscle_3D/myoLeg26_BASELINE.xml
+
+Camera settings:
+  View angle: Diagonal (azimuth=135°, elevation=-20°)
+  Distance: 5.0m
+  Transparency: Enabled (can see through floor)
+
+Rendering 300 frames...
+  Frame 0/300...
+  Frame 30/300...
+  ...
+
+Saving video: ref_S004_trial01_08mps_3D_HDF5_v7.mp4
+  Video FPS: 5.0 (target duration: ~60 seconds)
+
+Joint ranges:
+  q_pelvis_tx         : [-0.023, +0.019] rad
+  q_pelvis_ty         : [-0.031, +0.028] rad
+  ...
+
+✅ Done! Saved: ref_S004_trial01_08mps_3D_HDF5_v7.mp4
+```
+
+### 시각화 기능
+
+- **카메라 앵글**: 대각선 뷰 (azimuth=135°, elevation=-20°)
+- **투명도**: 바닥을 투명하게 처리하여 다리 움직임 명확히 확인
+- **팔 숨김**: 팔 geom을 투명 처리하여 다리에 집중
+- **높이 조정**: 모델을 바닥 위로 들어올려 자연스러운 걷기 시각화
+- **비디오 길이**: 약 60초 (조정 가능)
+
+### 검증 체크리스트
+
+비디오를 보고 확인할 사항:
+- [ ] 걷기 동작이 자연스러운가?
+- [ ] 관절 각도가 정상 범위인가?
+- [ ] 골반 회전/기울임이 합리적인가?
+- [ ] 무릎/발목 각도가 이상하지 않은가?
+- [ ] 모델이 바닥을 뚫고 들어가지 않는가?
+- [ ] 발 접촉이 자연스러운가?
+
+---
+
 ## 📝 추가 유틸리티
 
 ### 데이터 분석 스크립트들
@@ -228,6 +307,10 @@ python rl_train/analyzer/custom/render_hdf5_reference.py
 - `inspect_npz.py`: NPZ 파일 내용 확인
 
 모두 `myoassist_utils/custom/` 폴더에 있습니다.
+
+### 시각화 스크립트
+- `render_hdf5_reference.py`: NPZ reference motion을 비디오로 렌더링
+- 위치: `rl_train/analyzer/custom/`
 
 ---
 
