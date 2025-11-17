@@ -120,15 +120,15 @@ class EnvironmentHandler:
         
         Args:
             use_ver1_0: If True, use ver1_0 callback with WandB integration
-            wandb_config: WandB configuration dict (only used if use_ver1_0=True)
+            wandb_config: WandB configuration dict. If provided, enables WandB logging
         """
         from rl_train.train.train_configs.config_imitation import ImitationTrainSessionConfig
         
         from rl_train.utils import learning_callback
         
         if isinstance(config, ImitationTrainSessionConfig):
-            if use_ver1_0:
-                # ver1_0: Use enhanced callback with WandB
+            if use_ver1_0 or wandb_config is not None:
+                # ver1_0 or WandB enabled: Use enhanced callback with WandB
                 from rl_train.envs.myoassist_leg_imitation_ver1_0 import ImitationCustomLearningCallback_ver1_0
                 custom_callback = ImitationCustomLearningCallback_ver1_0(
                     log_rollout_freq=config.logger_params.logging_frequency,
@@ -139,9 +139,9 @@ class EnvironmentHandler:
                     config=config,
                     wandb_config=wandb_config,
                 )
-                print("✅ Using ver1_0 callback (WandB + 10% evaluation)")
+                print("✅ Using enhanced callback with WandB logging")
             else:
-                # Original callback
+                # Original callback without WandB
                 from rl_train.envs import myoassist_leg_imitation
                 custom_callback = myoassist_leg_imitation.ImitationCustomLearningCallback(
                     log_rollout_freq=config.logger_params.logging_frequency,
@@ -150,6 +150,7 @@ class EnvironmentHandler:
                     original_reward_weights=config.env_params.reward_keys_and_weights,
                     auto_reward_adjust_params=config.auto_reward_adjust_params,
                 )
+                print("⚠️  WandB logging disabled - use --wandb_project to enable")
         else:
             custom_callback = learning_callback.BaseCustomLearningCallback(
                 log_rollout_freq=config.logger_params.logging_frequency,

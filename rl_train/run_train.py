@@ -98,19 +98,20 @@ if __name__ == '__main__':
     os.makedirs(log_dir, exist_ok=True)
     train_log_handler = train_log_handler.TrainLogHandler(log_dir)
     
-    # Prepare WandB config if ver1_0 is enabled
+    # Prepare WandB config
     wandb_config = None
-    if args.use_ver1_0:
+    if args.use_ver1_0 or args.wandb_project:
         wandb_config = {
             'project': args.wandb_project,
             'name': args.wandb_name or f"train_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             'config': {
                 'model_type': '3D' if '3D' in config.env_params.model_path else '2D',
                 'total_timesteps': config.total_timesteps,
+                'version': VERSION,
             },
-            'tags': ['ver1_0', 'imitation'],
+            'tags': ['ver1_0' if args.use_ver1_0 else 'ver2_1', 'imitation'],
         }
-        print(f"\n✅ ver1_0 mode enabled with WandB: {wandb_config['project']}/{wandb_config['name']}\n")
+        print(f"\n✅ WandB enabled: {wandb_config['project']}/{wandb_config['name']}\n")
 
     if args.flag_realtime_evaluate:
         ppo_evaluate_with_rendering(config)
