@@ -7,6 +7,7 @@ import os
 from datetime import datetime
 from rl_train.envs.environment_handler import EnvironmentHandler
 import subprocess
+from pathlib import Path
 
 def get_git_info():
     try:
@@ -27,6 +28,70 @@ VERSION = {
     "version": "0.3.0",  # MAJOR.MINOR.PATCH
     **get_git_info()
 }
+
+def visualize_reference_motion(config, output_dir):
+    """
+    Visualize reference motion before training starts
+    
+    Args:
+        config: Training configuration
+        output_dir: Directory to save visualization video
+    """
+    # Check if config has reference data path
+    if not hasattr(config.env_params, 'reference_data_path'):
+        print("⏭️  No reference data to visualize (not an imitation task)")
+        return
+    
+    if not config.env_params.reference_data_path:
+        print("⏭️  No reference data to visualize (not an imitation task)")
+        return
+    
+    ref_data_path = Path(config.env_params.reference_data_path)
+    if not ref_data_path.exists():
+        print(f"⚠️  Reference data not found: {ref_data_path}")
+        return
+    
+    model_path = Path(config.env_params.model_path)
+    if not model_path.exists():
+        print(f"⚠️  Model file not found: {model_path}")
+        return
+    
+    print("\n" + "="*80)
+    print("🎬 REFERENCE MOTION VISUALIZATION")
+    print("="*80)
+    print(f"📁 Reference data: {ref_data_path.name}")
+    print(f"🤖 Model: {model_path.name}")
+    print(f"📊 Total timesteps: {config.total_timesteps:,}")
+    print(f"⏱️  This will take ~10-15 seconds...")
+    print("="*80 + "\n")
+    
+    # Import render function
+    try:
+        from rl_train.analyzer.custom.render_hdf5_reference import render_reference_motion
+    except ImportError:
+        print("⚠️  Could not import render_hdf5_reference module")
+        return
+    
+    # Generate output path
+    output_path = Path(output_dir) / f"ref_{ref_data_path.stem}_preview.mp4"
+    
+    # Render with fewer frames for quick preview (60 frames = ~6 second video)
+    try:
+        render_reference_motion(
+            npz_path=str(ref_data_path),
+            model_path=str(model_path),
+            output_path=str(output_path),
+            num_frames=60,  # Quick preview (6 seconds at 10fps)
+            height_offset=0.95
+        )
+        print(f"\n✅ Reference motion saved: {output_path}")
+        print(f"👀 Review this video to confirm you're using the correct reference data!")
+        print("="*80 + "\n")
+    except Exception as e:
+        print(f"⚠️  Failed to render reference motion: {e}")
+        print(f"   Training will continue anyway...")
+        print("="*80 + "\n")
+
 def ppo_evaluate_with_rendering(config):
     seed = 1234
     np.random.seed(seed)
@@ -98,20 +163,23 @@ if __name__ == '__main__':
     os.makedirs(log_dir, exist_ok=True)
     train_log_handler = train_log_handler.TrainLogHandler(log_dir)
     
-    # Prepare WandB config
+    # 🎬 Visualize reference motion BEFORE training starts
+    if not args.flag_realtime_evaluate:
+        visualize_reference_motion(config, log_dir)
+    
+    # Prepare WandB config if ver1_0 is enabled
     wandb_config = None
-    if args.use_ver1_0 or args.wandb_project:
+    if args.use_ver1_0:
         wandb_config = {
             'project': args.wandb_project,
             'name': args.wandb_name or f"train_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             'config': {
                 'model_type': '3D' if '3D' in config.env_params.model_path else '2D',
                 'total_timesteps': config.total_timesteps,
-                'version': VERSION,
             },
-            'tags': ['ver1_0' if args.use_ver1_0 else 'ver2_1', 'imitation'],
+            'tags': ['ver1_0', 'imitation'],
         }
-        print(f"\n✅ WandB enabled: {wandb_config['project']}/{wandb_config['name']}\n")
+        print(f"\n✅ ver1_0 mode enabled with WandB: {wandb_config['project']}/{wandb_config['name']}\n")
 
     if args.flag_realtime_evaluate:
         ppo_evaluate_with_rendering(config)
