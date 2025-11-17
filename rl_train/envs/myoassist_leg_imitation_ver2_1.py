@@ -57,6 +57,7 @@ class MyoAssistLegImitation_ver2_1(MyoAssistLegImitation):
         # Store parameters before parent setup
         self._max_rot = kwargs.get('max_rot', env_params.__dict__.get('max_rot', 0.6))  # default: cos(53°) ≈ 0.6
         self.safe_height = env_params.safe_height
+        self._step_count = 0  # Track steps to skip rotation check during initialization
         
         # Call parent setup (ver1_0 Karico)
         super()._setup(
@@ -147,15 +148,51 @@ class MyoAssistLegImitation_ver2_1(MyoAssistLegImitation):
         """
         251117_Ver2_1: Override to add rotation-based termination
         
-        Checks both height and rotation criteria
+        Checks both height and rotation criteria.
+        Skip rotation check for first 10 steps to allow initialization.
         """
         # Check height termination (from parent)
         pelvis_height = self.sim.data.joint('pelvis_ty').qpos[0].copy()
         if pelvis_height < self.safe_height:
             return True
         
+        # Skip rotation check during initialization (first 10 steps)
+        if self._step_count < 10:
+            return False
+        
         # Check rotation termination
         if self._check_rotation_termination():
             return True
         
         return False
+    
+    def step(self, a, **kwargs):
+        """251117_Ver2_1: Override to track step count"""
+        result = super().step(a, **kwargs)
+        self._step_count += 1
+        return result
+    
+    def reset(self, **kwargs):
+        """251117_Ver2_1: Override to reset step count"""
+        self._step_count = 0
+        return super().reset(**kwargs)
+    
+    def _get_qvel_diff(self):
+        """
+        251117_Ver2_1: Override to handle divide-by-zero in velocity calculation
+        
+        Fixes issue where reference velocity can be zero at initialization.
+        """
+        # Get reference velocity with epsilon to prevent divide-by-zero
+        ref_velocity = self._reference_data["series_data"]["dq_pelvis_tx"][self._imitation_index]
+        speed_ratio_to_target_velocity = self._target_velocity / (ref_velocity + 1e-8)
+
+        def get_qvel_diff_one(key:str):
+            diff = self.sim.data.joint(f"{key}").qvel[0].copy() - self._reference_data["series_data"][f"dq_{key}"][self._imitation_index] * speed_ratio_to_target_velocity
+            return diff
+        
+        name_diff_dict = {}
+        for q_key in self._reward_keys_and_weights.qvel_imitation_rewards:
+            name_diff_dict[q_key] = get_qvel_diff_one(q_key)
+        
+        return name_diff_dict
