@@ -134,8 +134,8 @@ class BaseCustomLearningCallback(BaseCallback):
                 std=get_logger_value('train/std'),
                 value_loss=get_logger_value('train/value_loss'),
                 num_timesteps=self.model.num_timesteps,
-                average_num_timestep=(np.sum(self.episode_length_counts) / np.sum(self.episode_counts) if np.sum(self.episode_counts) != 0 else np.array(0)).item(),
-                average_reward_per_episode=(np.sum(self.rewards_sum) / np.sum(self.episode_counts) if np.sum(self.episode_counts) != 0 else np.array(0)).item(),
+                average_num_timestep=float(np.sum(self.episode_length_counts) / np.sum(self.episode_counts) if np.sum(self.episode_counts) != 0 else 0),
+                average_reward_per_episode=float(np.sum(self.rewards_sum) / np.sum(self.episode_counts) if np.sum(self.episode_counts) != 0 else 0),
                 average_reward_dict_per_episode=average_reward_dict_per_episode,
                 time=f"{datetime.now().strftime('%Y%m%d-%H%M%S.%f')}",
             )
