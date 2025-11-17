@@ -72,23 +72,27 @@ def visualize_reference_motion(config, output_dir):
         print("⚠️  Could not import render_hdf5_reference module")
         return
     
-    # Generate output path
-    output_path = Path(output_dir) / f"ref_{ref_data_path.stem}_preview_multiview.mp4"
+    # Generate timestamp-based output path
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    output_filename = f"{timestamp}_reference_motion_multiview.mp4"
+    output_path = Path(output_dir) / output_filename
     
     # Render with more frames for smoother motion + multiview
+    # Lower FPS (15) for slower, more viewable playback
     try:
         render_reference_motion(
             npz_path=str(ref_data_path),
             model_path=str(model_path),
             output_path=str(output_path),
-            num_frames=600,  # 600 frames for smooth 20-second video at 30fps
+            num_frames=600,  # 600 frames for smooth motion
             height_offset=0.95,
-            fps=30,  # 30 FPS for smooth playback
+            fps=15,  # 15 FPS for slower playback (40 seconds video)
             multiview=True  # Front + Side views
         )
         print(f"\n✅ Reference motion saved: {output_path}")
+        print(f"📹 Video info: 600 frames @ 15 fps = ~40 seconds")
         print(f"👀 Review this video to confirm you're using the correct reference data!")
-        print(f"   🎥 Front view (left) + Side view (right) for symmetry check")
+        print(f"   🎥 Left: Front view | Right: Side view (check symmetry)")
         print("="*80 + "\n")
     except Exception as e:
         print(f"⚠️  Failed to render reference motion: {e}")
@@ -162,8 +166,19 @@ if __name__ == '__main__':
     DictionableDataclass.set_from_args(config, args, prefix="config.")
 
 
-    log_dir = os.path.join("rl_train","results", f"train_session_{datetime.now().strftime('%Y%m%d-%H%M%S')}")
+    # Create timestamped log directory with clear naming
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    
+    # Extract meaningful name from config
+    config_name = Path(args.config_file_path).stem  # e.g., S004_3D_IL_ver2_1_BALANCE
+    session_name = f"{timestamp}_{config_name}"
+    
+    log_dir = os.path.join("rl_train", "results", session_name)
     os.makedirs(log_dir, exist_ok=True)
+    
+    print(f"\n📁 Session directory: {log_dir}")
+    print(f"   All results (videos, models, logs) will be saved here.\n")
+    
     train_log_handler = train_log_handler.TrainLogHandler(log_dir)
     
     # 🎬 Visualize reference motion BEFORE training starts

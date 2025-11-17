@@ -140,14 +140,21 @@ class ImitationCustomLearningCallback_ver1_0(BaseCustomLearningCallback):
     def _evaluate_and_render(self, progress_pct):
         """ver1_0: 중간 평가 및 렌더링 수행"""
         import os
+        from datetime import datetime
         from rl_train.envs.environment_handler import EnvironmentHandler
         
-        # 저장 디렉토리 생성
-        eval_dir = os.path.join(self.train_log_handler.log_dir, f"eval_{progress_pct}pct")
+        # 저장 디렉토리 생성 (타임스탬프 포함)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        eval_dir = os.path.join(self.train_log_handler.log_dir, f"eval_{progress_pct}pct_{timestamp}")
         os.makedirs(eval_dir, exist_ok=True)
         
+        print(f"\n{'='*80}")
+        print(f"📊 EVALUATION @ {progress_pct}% ({self.num_timesteps:,} steps)")
+        print(f"📁 Saving to: {eval_dir}")
+        print(f"{'='*80}\n")
+        
         # 현재 모델 임시 저장
-        model_path = os.path.join(eval_dir, "temp_model.zip")
+        model_path = os.path.join(eval_dir, f"{timestamp}_model.zip")
         self.model.save(model_path)
         print(f"💾 모델 저장: {model_path}")
         
@@ -202,11 +209,13 @@ class ImitationCustomLearningCallback_ver1_0(BaseCustomLearningCallback):
         
         # 비디오 저장
         if video_enabled and len(frames) > 0:
-            video_path = os.path.join(eval_dir, "evaluation.mp4")
+            video_filename = f"{timestamp}_eval_{progress_pct}pct.mp4"
+            video_path = os.path.join(eval_dir, video_filename)
             print(f"💾 비디오 저장 중... ({len(frames)} 프레임)")
             try:
                 imageio.mimsave(video_path, frames, fps=15)
-                print(f"🎬 비디오 저장 완료: {video_path}")
+                print(f"🎬 비디오 저장: {video_path}")
+                print(f"   📹 재생 속도: 15 fps (천천히 보기 편함)")
             except Exception as e:
                 print(f"⚠️ 비디오 저장 실패: {e}")
         
