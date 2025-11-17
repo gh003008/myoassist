@@ -153,20 +153,20 @@ class BaseCustomLearningCallback(BaseCallback):
         if self.log_count % self.evaluate_freq == 0 and self.log_count != 0:
             # Create new pool each time to prevent memory leaks
 
-            # For debug:
-            # _analyze_process(self.train_log_handler.log_dir)
+            # For debug - disable multiprocessing to avoid reference data loading issues:
+            _analyze_process(self.train_log_handler.log_dir)
             
-            pool = Pool(processes=1)
-            try:
-                pool.apply(
-                    _analyze_process,
-                    args=(self.train_log_handler.log_dir,)
-                )
-            finally:
-                # Always cleanup pool resources, even if error occurs
-                pool.close()  # No more tasks
-                pool.join()   # Wait for worker processes to exit
-                # Note: If error occurred in pool.apply(), it will still propagate after cleanup
+            # pool = Pool(processes=1)
+            # try:
+            #     pool.apply(
+            #         _analyze_process,
+            #         args=(self.train_log_handler.log_dir,)
+            #     )
+            # finally:
+            #     # Always cleanup pool resources, even if error occurs
+            #     pool.close()  # No more tasks
+            #     pool.join()   # Wait for worker processes to exit
+            #     # Note: If error occurred in pool.apply(), it will still propagate after cleanup
         self.log_count += 1
         
         return log_data
