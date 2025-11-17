@@ -8,12 +8,14 @@ import mujoco
 import imageio
 from pathlib import Path
 
-def render_reference_motion(npz_path, model_path, output_path, num_frames=300, height_offset=0.95):
+def render_reference_motion(npz_path, model_path, output_path, num_frames=300, height_offset=0.95, fps=30, multiview=False):
     """Render reference motion from NPZ file
     
     Args:
         height_offset: Vertical offset to lift model above ground (meters)
                       Default 0.95m is approximately pelvis height for standing
+        fps: Frames per second for output video (default: 30)
+        multiview: If True, render front and side views side-by-side
     """
     
     print(f'Loading reference: {npz_path}')
@@ -25,6 +27,8 @@ def render_reference_motion(npz_path, model_path, output_path, num_frames=300, h
     print(f'  DOF: {q_ref.shape[1]}')
     print(f'  Joints: {list(joint_names)}')
     print(f'  Height offset: {height_offset:.3f} m')
+    print(f'  FPS: {fps}')
+    print(f'  Multiview: {"Yes (Front + Side)" if multiview else "No (Diagonal only)"}')
     
     # Load MuJoCo model
     print(f'Loading model: {model_path}')
@@ -84,22 +88,90 @@ def render_reference_motion(npz_path, model_path, output_path, num_frames=300, h
     print(f'      (e.g., knee_r_translation1/2) are interspersed between main joints.')
     print(f'{"="*80}\n')
     
+    # ============================================================================
+    # SYMMETRY CHECK: Compare left vs right joint values
+    # ============================================================================
+    print(f'{"="*80}')
+    print(f'SYMMETRY CHECK: Left vs Right Joint Comparison')
+    print(f'{"="*80}')
+    
+    # Define symmetric joint pairs (left vs right)
+    symmetric_pairs = [
+        ('hip_flexion_l', 'hip_flexion_r', 9, 6),
+        ('hip_adduction_l', 'hip_adduction_r', 10, 7),
+        ('hip_rotation_l', 'hip_rotation_r', 11, 8),
+        ('knee_angle_l', 'knee_angle_r', 13, 12),
+        ('ankle_angle_l', 'ankle_angle_r', 15, 14),
+    ]
+    
+    print(f'{"Joint Pair":<35} {"Mean Diff":<12} {"Max Diff":<12} {"Symmetric?"}')
+    print(f'{"-"*80}')
+    
+    for left_name, right_name, left_idx, right_idx in symmetric_pairs:
+        left_vals = q_ref[:, left_idx]
+        right_vals = q_ref[:, right_idx]
+        
+        # For symmetric gait, left and right should have similar ranges but phase-shifted
+        # Check if magnitude ranges are similar
+        left_range = left_vals.max() - left_vals.min()
+        right_range = right_vals.max() - right_vals.min()
+        range_diff = abs(left_range - right_range)
+        
+        # Mean absolute difference
+        mean_diff = np.mean(np.abs(left_vals - right_vals))
+        max_diff = np.max(np.abs(left_vals - right_vals))
+        
+        # Symmetric if range difference is small (< 0.05 rad or 3°)
+        is_symmetric = range_diff < 0.05
+        status = "✅ Yes" if is_symmetric else "⚠️  CHECK"
+        
+        print(f'{left_name} vs {right_name:<15} {mean_diff:>8.4f} rad   {max_diff:>8.4f} rad   {status}')
+        print(f'  Range: L=[{left_vals.min():+.3f}, {left_vals.max():+.3f}] vs R=[{right_vals.min():+.3f}, {right_vals.max():+.3f}]  (diff={range_diff:.4f} rad)')
+    
+    print(f'{"-"*80}')
+    print(f'Note: Symmetric gait means LEFT and RIGHT have similar motion RANGES,')
+    print(f'      but they are PHASE-SHIFTED (when left swings, right supports).')
+    print(f'{"="*80}\n')
+    
     # Setup renderer with better visualization options
-    renderer = mujoco.Renderer(model, height=720, width=1280)
+    if multiview:
+        # Multiview: side-by-side rendering (front + side)
+        renderer = mujoco.Renderer(model, height=720, width=2560)  # 1280x2 for side-by-side
+        print(f'\n🎥 Renderer: 2560x720 (Front + Side views side-by-side)')
+    else:
+        renderer = mujoco.Renderer(model, height=720, width=1280)
+        print(f'\n🎥 Renderer: 1280x720 (Diagonal view only)')
     
-    # Configure camera for diagonal view (isometric-like)
-    # Default is often straight-on; we want 3/4 view
-    camera = mujoco.MjvCamera()
-    mujoco.mjv_defaultFreeCamera(model, camera)
-    
-    # Set camera position for diagonal view
-    # azimuth: rotation around vertical axis (degrees)
-    # elevation: angle above horizontal (degrees)  
-    # distance: how far from the model
-    camera.azimuth = 135  # 45 degrees from side (diagonal)
-    camera.elevation = -20  # Look down slightly
-    camera.distance = 5.0  # Zoom level (increased from 3.5 to see more)
-    camera.lookat[:] = [0, 0.5, 0]  # Look at pelvis height
+    # Configure cameras
+    if multiview:
+        # Front view camera
+        camera_front = mujoco.MjvCamera()
+        mujoco.mjv_defaultFreeCamera(model, camera_front)
+        camera_front.azimuth = 90      # Front view
+        camera_front.elevation = -10   # Slightly above
+        camera_front.distance = 4.0
+        camera_front.lookat[:] = [0, 0.5, 0]
+        
+        # Side view camera
+        camera_side = mujoco.MjvCamera()
+        mujoco.mjv_defaultFreeCamera(model, camera_side)
+        camera_side.azimuth = 0        # Side view (sagittal plane)
+        camera_side.elevation = -10
+        camera_side.distance = 4.0
+        camera_side.lookat[:] = [0, 0.5, 0]
+        
+        print(f'  Front view: azimuth=90° (frontal plane)')
+        print(f'  Side view:  azimuth=0° (sagittal plane)')
+    else:
+        # Diagonal view camera
+        camera_diagonal = mujoco.MjvCamera()
+        mujoco.mjv_defaultFreeCamera(model, camera_diagonal)
+        camera_diagonal.azimuth = 135   # 45 degrees from side (diagonal)
+        camera_diagonal.elevation = -20  # Look down slightly
+        camera_diagonal.distance = 5.0
+        camera_diagonal.lookat[:] = [0, 0.5, 0]
+        
+        print(f'  Diagonal view: azimuth=135° (3/4 view)')
     
     # Enable transparency and better rendering
     scene_option = mujoco.MjvOption()
@@ -129,9 +201,6 @@ def render_reference_motion(npz_path, model_path, output_path, num_frames=300, h
             # Set geom rgba to fully transparent
             model.geom_rgba[i, 3] = 0.0  # Alpha = 0 (invisible)
     
-    print(f'\nCamera settings:')
-    print(f'  View angle: Diagonal (azimuth={camera.azimuth}°, elevation={camera.elevation}°)')
-    print(f'  Distance: {camera.distance}m')
     print(f'  Transparency: Enabled (can see through floor)')
     
     # Render frames
@@ -176,25 +245,34 @@ def render_reference_motion(npz_path, model_path, output_path, num_frames=300, h
         # Forward kinematics
         mujoco.mj_forward(model, data_mj)
         
-        # Render with custom camera and transparency
-        renderer.update_scene(data_mj, camera=camera, scene_option=scene_option)
-        pixels = renderer.render()
-        frames.append(pixels)
+        # Render with multiview or single view
+        if multiview:
+            # Render front view (left half)
+            renderer.update_scene(data_mj, camera=camera_front, scene_option=scene_option)
+            pixels_front = renderer.render()
+            front_half = pixels_front[:, :1280]  # Left 1280 pixels
+            
+            # Render side view (right half)
+            renderer.update_scene(data_mj, camera=camera_side, scene_option=scene_option)
+            pixels_side = renderer.render()
+            side_half = pixels_side[:, :1280]  # Left 1280 pixels
+            
+            # Concatenate horizontally
+            pixels = np.concatenate([front_half, side_half], axis=1)
+        else:
+            # Single diagonal view
+            renderer.update_scene(data_mj, camera=camera_diagonal, scene_option=scene_option)
+            pixels = renderer.render()
         
-        if (i // frame_skip) % 30 == 0:
-            print(f'  Frame {i // frame_skip}/{num_frames}...')
+        frames.append(pixels)
         
         if (i // frame_skip) % 30 == 0:
             print(f'  Frame {i // frame_skip}/{num_frames}...')
     
     # Save video
     print(f'Saving video: {output_path}')
-    # FPS calculation for desired video duration:
-    # Original data: 100Hz, frame_skip frames apart
-    # To make ~1min video from 2min data: effective_fps = num_frames / 60
-    effective_fps = num_frames / 60.0  # Target: 1 minute video
-    print(f'  Video FPS: {effective_fps:.1f} (target duration: ~60 seconds)')
-    imageio.mimsave(output_path, frames, fps=effective_fps)
+    print(f'  Video FPS: {fps} (smooth playback)')
+    imageio.mimsave(output_path, frames, fps=fps)
     
     # Print joint statistics
     print('\nJoint ranges:')
@@ -211,12 +289,16 @@ def main():
     parser.add_argument('--model', type=str, 
                         default=r'C:\workspace_home\myoassist\models\26muscle_3D\myoLeg26_TUTORIAL.xml',
                         help='MuJoCo model XML path')
-    parser.add_argument('--frames', type=int, default=300,
-                        help='Number of frames to render')
+    parser.add_argument('--frames', type=int, default=600,
+                        help='Number of frames to render (default: 600 for smooth motion)')
+    parser.add_argument('--fps', type=int, default=30,
+                        help='Output video FPS (default: 30)')
     parser.add_argument('--output', type=str, default=None,
                         help='Output video path')
     parser.add_argument('--height', type=float, default=0.95,
                         help='Height offset to lift model above ground (meters)')
+    parser.add_argument('--multiview', action='store_true',
+                        help='Render front and side views side-by-side')
     
     args = parser.parse_args()
     
@@ -227,9 +309,10 @@ def main():
         npz_path = Path('rl_train/reference_data') / f'{args.data}.npz'
     
     if args.output is None:
-        args.output = f'ref_{Path(args.data).stem}.mp4'
+        suffix = '_multiview' if args.multiview else ''
+        args.output = f'ref_{Path(args.data).stem}{suffix}.mp4'
     
-    render_reference_motion(npz_path, args.model, args.output, args.frames, args.height)
+    render_reference_motion(npz_path, args.model, args.output, args.frames, args.height, args.fps, args.multiview)
 
 if __name__ == '__main__':
     main()

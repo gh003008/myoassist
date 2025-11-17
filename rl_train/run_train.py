@@ -62,7 +62,7 @@ def visualize_reference_motion(config, output_dir):
     print(f"📁 Reference data: {ref_data_path.name}")
     print(f"🤖 Model: {model_path.name}")
     print(f"📊 Total timesteps: {config.total_timesteps:,}")
-    print(f"⏱️  This will take ~10-15 seconds...")
+    print(f"⏱️  This will take ~20-30 seconds (high quality + multiview)...")
     print("="*80 + "\n")
     
     # Import render function
@@ -73,19 +73,22 @@ def visualize_reference_motion(config, output_dir):
         return
     
     # Generate output path
-    output_path = Path(output_dir) / f"ref_{ref_data_path.stem}_preview.mp4"
+    output_path = Path(output_dir) / f"ref_{ref_data_path.stem}_preview_multiview.mp4"
     
-    # Render with fewer frames for quick preview (60 frames = ~6 second video)
+    # Render with more frames for smoother motion + multiview
     try:
         render_reference_motion(
             npz_path=str(ref_data_path),
             model_path=str(model_path),
             output_path=str(output_path),
-            num_frames=60,  # Quick preview (6 seconds at 10fps)
-            height_offset=0.95
+            num_frames=600,  # 600 frames for smooth 20-second video at 30fps
+            height_offset=0.95,
+            fps=30,  # 30 FPS for smooth playback
+            multiview=True  # Front + Side views
         )
         print(f"\n✅ Reference motion saved: {output_path}")
         print(f"👀 Review this video to confirm you're using the correct reference data!")
+        print(f"   🎥 Front view (left) + Side view (right) for symmetry check")
         print("="*80 + "\n")
     except Exception as e:
         print(f"⚠️  Failed to render reference motion: {e}")
