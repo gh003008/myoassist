@@ -118,19 +118,34 @@ class EnvironmentHandler:
         """
         Get callback for training
         
+        Automatically selects the appropriate callback based on env_id:
+        - ver2_1: Uses ImitationCustomLearningCallback_ver2_1 (with WandB if configured)
+        - ver1_0/ver1_1: Uses ImitationCustomLearningCallback_ver1_0 (with WandB if configured)
+        - Other: Uses base callback
+        
         Args:
-            use_ver1_0: If True, use ver1_0 callback with WandB integration
+            use_ver1_0: Legacy flag for backward compatibility
             wandb_config: WandB configuration dict. If provided, enables WandB logging
         """
         from rl_train.train.train_configs.config_imitation import ImitationTrainSessionConfig
-        
         from rl_train.utils import learning_callback
         
         if isinstance(config, ImitationTrainSessionConfig):
-            if use_ver1_0 or wandb_config is not None:
-                # ver1_0 or WandB enabled: Use enhanced callback with WandB
-                from rl_train.envs.myoassist_leg_imitation_ver1_0 import ImitationCustomLearningCallback_ver1_0
-                custom_callback = ImitationCustomLearningCallback_ver1_0(
+            # Determine version from env_id
+            env_id = config.env_params.env_id
+            
+            if 'v2_1' in env_id or use_ver1_0 or wandb_config is not None:
+                # Ver2_1 or WandB enabled: Use enhanced callback
+                if 'v2_1' in env_id:
+                    from rl_train.envs.myoassist_leg_imitation_ver2_1 import ImitationCustomLearningCallback_ver2_1
+                    callback_class = ImitationCustomLearningCallback_ver2_1
+                    version_name = "ver2_1"
+                else:
+                    from rl_train.envs.myoassist_leg_imitation_ver1_0 import ImitationCustomLearningCallback_ver1_0
+                    callback_class = ImitationCustomLearningCallback_ver1_0
+                    version_name = "ver1_0"
+                
+                custom_callback = callback_class(
                     log_rollout_freq=config.logger_params.logging_frequency,
                     evaluate_freq=config.logger_params.evaluate_frequency,
                     log_handler=train_log_handler,
@@ -139,7 +154,11 @@ class EnvironmentHandler:
                     config=config,
                     wandb_config=wandb_config,
                 )
-                print("✅ Using enhanced callback with WandB logging")
+                
+                if wandb_config:
+                    print(f"✅ Using {version_name} callback with WandB logging")
+                else:
+                    print(f"✅ Using {version_name} callback (WandB not configured)")
             else:
                 # Original callback without WandB
                 from rl_train.envs import myoassist_leg_imitation
@@ -150,7 +169,7 @@ class EnvironmentHandler:
                     original_reward_weights=config.env_params.reward_keys_and_weights,
                     auto_reward_adjust_params=config.auto_reward_adjust_params,
                 )
-                print("⚠️  WandB logging disabled - use --wandb_project to enable")
+                print("⚠️  Using base callback - WandB logging disabled")
         else:
             custom_callback = learning_callback.BaseCustomLearningCallback(
                 log_rollout_freq=config.logger_params.logging_frequency,
