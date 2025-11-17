@@ -196,3 +196,22 @@ class MyoAssistLegImitation_ver2_1(MyoAssistLegImitation):
             name_diff_dict[q_key] = get_qvel_diff_one(q_key)
         
         return name_diff_dict
+    
+    def _follow_reference_motion(self, is_x_follow:bool):
+        """
+        251117_Ver2_1: Override to handle divide-by-zero in velocity setting
+        
+        Fixes issue where reference velocity can be zero at initialization.
+        """
+        # Set positions
+        for key in self.reference_data_keys:
+            self.sim.data.joint(f"{key}").qpos = self._reference_data["series_data"][f"q_{key}"][self._imitation_index]
+            if not is_x_follow and key == 'pelvis_tx':
+                self.sim.data.joint(f"{key}").qpos = 0
+        
+        # Set velocities with epsilon to prevent divide-by-zero
+        ref_velocity = self._reference_data["series_data"]["dq_pelvis_tx"][self._imitation_index]
+        speed_ratio_to_target_velocity = self._target_velocity / (ref_velocity + 1e-8)
+        
+        for key in self.reference_data_keys:
+            self.sim.data.joint(f"{key}").qvel = self._reference_data["series_data"][f"dq_{key}"][self._imitation_index] * speed_ratio_to_target_velocity
