@@ -15,8 +15,9 @@ Extension: 3D balancing rewards from previous ver1_1 work
 
 import collections
 import numpy as np
+# Ver2_1: Import from ver1_0 (Karico base)
 from rl_train.envs.myoassist_leg_imitation_ver1_0 import (
-    MyoAssistLegImitation, 
+    MyoAssistLegImitation,  # Ver1_0 Karico base class
     ImitationCustomLearningCallback_ver1_0
 )
 from rl_train.train.train_configs.config_imitation import ImitationTrainSessionConfig

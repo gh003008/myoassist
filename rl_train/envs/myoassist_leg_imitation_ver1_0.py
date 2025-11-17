@@ -340,7 +340,8 @@ class MyoAssistLegImitation(MyoAssistLegBase):
             loop_reference_data:bool = False,
             **kwargs,
         ):
-        self._flag_random_ref_index = env_params.flag_random_ref_index
+        # Ver2_1: Use getattr with default for compatibility
+        self._flag_random_ref_index = getattr(env_params, 'flag_random_ref_index', False)
         self._out_of_trajectory_threshold = env_params.out_of_trajectory_threshold
         self.reference_data_keys = env_params.reference_data_keys
         self._loop_reference_data = loop_reference_data
