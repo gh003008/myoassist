@@ -99,7 +99,7 @@ class EnvironmentHandler:
             return TrainSessionConfigBase
         elif session_id in ['myoAssistLegImitation-v0']:
             return ImitationTrainSessionConfig
-        elif session_id == 'myoAssistLegImitationExo-v0':
+        elif session_id in ['myoAssistLegImitationExo-v0', 'myoAssistLegImitationExo-v2_1']:  # 251117_Ver2_1: 추가
             return ExoImitationTrainSessionConfig
         raise ValueError(f"Invalid session id: {session_id}")
         
@@ -163,7 +163,7 @@ class EnvironmentHandler:
         import stable_baselines3
         from rl_train.train.policies.rl_agent_human import HumanActorCriticPolicy
         from rl_train.train.policies.rl_agent_exo import HumanExoActorCriticPolicy
-        if config.env_params.env_id in ["myoAssistLegImitationExo-v0"]:
+        if config.env_params.env_id in ["myoAssistLegImitationExo-v0", "myoAssistLegImitationExo-v2_1"]:  # 251117_Ver2_1: 추가
             policy_class = HumanExoActorCriticPolicy
             print(f"Using HumanExoActorCriticPolicy")
         else:

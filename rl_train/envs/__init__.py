@@ -54,6 +54,13 @@ register_env_myoassist(id='myoAssistLegImitationExo-v0',
         max_episode_steps=1000,
         kwargs={},
     )
+
+# 251117_Ver2_1: Ver2_0 Karico + 3D balancing rewards
+register_env_myoassist(id='myoAssistLegImitationExo-v2_1',
+        entry_point='rl_train.envs.myoassist_leg_imitation_ver2_1:MyoAssistLegImitation_ver2_1',
+        max_episode_steps=1000,
+        kwargs={},
+    )
 # register_env_myoassist(id='myoLeg18RewardPerStep-v0',
 #         entry_point='rl_train.envs.myo_leg_18_reward_per_step:myoLeg18RewardPerStep',
 #         max_episode_steps=1000,

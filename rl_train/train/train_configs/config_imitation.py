@@ -15,8 +15,10 @@ class ImitationTrainSessionConfig(TrainSessionConfigBase):
             qvel_imitation_rewards:dict = field(default_factory=dict)
             
             end_effector_imitation_reward: float = 0.3
-
             
+            # 251117_Ver2_1: Balancing rewards for 3D stability
+            pelvis_list_penalty: float = 0.0
+            pelvis_height_reward: float = 0.0
 
         reward_keys_and_weights: RewardWeights = field(default_factory=RewardWeights)
 
