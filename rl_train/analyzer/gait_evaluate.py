@@ -384,9 +384,16 @@ class ImitationGaitEvaluator(GaitEvaluatorBase):
 
         if self.session_config.env_params.reference_data_path.endswith(".npz"):
             ref_data_npz = np.load(self.session_config.env_params.reference_data_path, allow_pickle=True)
-            # keys = ref_data_npz.files
-            # ref_data_dict = {key: ref_data_npz[key] for key in keys}
-            ref_data_dict = {key: ref_data_npz[key].item() for key in ref_data_npz.files}
+            # Convert NPZ to dict - handle both arrays and nested dicts properly
+            ref_data_dict = {}
+            for key in ref_data_npz.files:
+                data = ref_data_npz[key]
+                # If it's a 0-d array wrapping a dict/scalar, extract with .item()
+                if isinstance(data, np.ndarray) and data.ndim == 0:
+                    ref_data_dict[key] = data.item()
+                else:
+                    # For regular arrays, keep as-is
+                    ref_data_dict[key] = data
         elif self.session_config.env_params.reference_data_path.endswith(".json"):
             with open(self.session_config.env_params.reference_data_path, 'r') as f:
                 ref_data_dict = json.load(f)

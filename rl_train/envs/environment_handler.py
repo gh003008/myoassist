@@ -58,7 +58,14 @@ class EnvironmentHandler:
         print("===================================================================")
         if config.env_params.reference_data_path.endswith(".npz"):
             ref_data_npz = np.load(config.env_params.reference_data_path, allow_pickle=True)
-            ref_data_dict = {key: ref_data_npz[key].item() for key in ref_data_npz.files}
+            ref_data_dict = {}
+            for key in ref_data_npz.files:
+                data = ref_data_npz[key]
+                # Use .item() only for scalar values
+                if data.shape == ():
+                    ref_data_dict[key] = data.item()
+                else:
+                    ref_data_dict[key] = data
         elif config.env_params.reference_data_path.endswith(".json"):
             with open(config.env_params.reference_data_path, 'r') as f:
                 ref_data_dict = json.load(f)
