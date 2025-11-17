@@ -98,9 +98,12 @@ if __name__ == '__main__':
     parser.add_argument("--flag_realtime_evaluate", type=bool, default=False, action=argparse.BooleanOptionalAction, help="realtime evaluate(True/False)")
     
     # ver1_0: WandB arguments
-    parser.add_argument("--wandb_project", type=str, default="myoassist-imitation", help="WandB project name")
+    parser.add_argument("--wandb_project", type=str, default="myoassist-rl", help="WandB project name")
     parser.add_argument("--wandb_name", type=str, default=None, help="WandB run name")
     parser.add_argument("--enable_wandb", type=bool, default=False, action=argparse.BooleanOptionalAction, help="Enable WandB logging")
+    
+    # ver1_0: Resume training arguments
+    parser.add_argument("--resume_from", type=str, default=None, help="Path to previous training session directory to resume from (e.g., rl_train/results/train_session_20251117-143446)")
 
     args, unknown_args = parser.parse_known_args()
     if args.config_file_path is None:
@@ -115,9 +118,34 @@ if __name__ == '__main__':
 
     DictionableDataclass.set_from_args(config, args, prefix="config.")
 
-    log_dir = os.path.join("rl_train","results", f"train_session_{datetime.now().strftime('%Y%m%d-%H%M%S')}")
-    os.makedirs(log_dir, exist_ok=True)
-    train_log_handler = train_log_handler.TrainLogHandler(log_dir)
+    # ver1_0: Resume training if specified
+    if args.resume_from:
+        print(f"🔄 Resuming training from: {args.resume_from}")
+        log_dir = args.resume_from
+        train_log_handler = train_log_handler.TrainLogHandler(log_dir)
+        
+        # Load existing log data with appropriate checkpoint type
+        from rl_train.utils.train_checkpoint_data_imitation import ImitationTrainCheckpointData
+        train_log_handler.load_log_data(ImitationTrainCheckpointData)
+        
+        # Find the latest model checkpoint
+        model_dir = os.path.join(log_dir, "trained_models")
+        if os.path.exists(model_dir):
+            model_files = [f for f in os.listdir(model_dir) if f.endswith('.zip')]
+            if model_files:
+                # Extract timesteps from filename (e.g., model_593920.zip -> 593920)
+                latest_model = max(model_files, key=lambda x: int(x.split('_')[1].split('.')[0]))
+                latest_timestep = int(latest_model.split('_')[1].split('.')[0])
+                config.env_params.prev_trained_policy_path = os.path.join(model_dir, latest_model)
+                print(f"📦 Loading checkpoint: {latest_model} ({latest_timestep:,} timesteps)")
+            else:
+                print("⚠️ No model checkpoints found, starting from scratch")
+        else:
+            print("⚠️ Model directory not found, starting from scratch")
+    else:
+        log_dir = os.path.join("rl_train","results", f"train_session_{datetime.now().strftime('%Y%m%d-%H%M%S')}")
+        os.makedirs(log_dir, exist_ok=True)
+        train_log_handler = train_log_handler.TrainLogHandler(log_dir)
     
     # ver1_0: Prepare WandB config
     wandb_config = None
