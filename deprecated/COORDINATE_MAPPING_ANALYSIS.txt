@@ -1,0 +1,48 @@
+"""
+Coordinate System & Joint Mapping Analysis
+==========================================
+
+1. OpenSim Coordinate System (from HDF5):
+   - X: Right
+   - Y: Up  
+   - Z: Forward
+
+2. MuJoCo Coordinate System (MyoAssist model):
+   - From convert_motion_data.py analysis:
+     * pelvis_tx = OpenSim tz (forward)
+     * pelvis_ty = -OpenSim tx (left = -right)  
+     * pelvis_tz = OpenSim ty (up)
+   - So MuJoCo axes are: X=forward, Y=left, Z=up
+
+3. Current NPZ→MyoAssist Mapping (convert_motion_data.py):
+   
+   Pelvis Translations:
+   - q_pelvis_tx = opensim_tz           # forward
+   - q_pelvis_ty = -opensim_tx + offset  # left + height offset
+   - q_pelvis_tz = opensim_ty           # up
+   
+   Pelvis Rotations:
+   - q_pelvis_list = opensim_rotation    # Z→X (twist → roll)
+   - q_pelvis_tilt = -opensim_list + 75deg  # X→Y (side → pitch) + offset
+   - q_pelvis_rotation = opensim_tilt    # Y→Z (tilt → yaw)
+   
+   Hip Joints (from NPZ correlation analysis):
+   - hip_flexion_r = -hip_r_1 (NEGATIVE!)
+   - hip_adduction_r = -hip_r_5 (NEGATIVE!)
+   - hip_rotation_r = -hip_r_2 (NEGATIVE!)
+
+4. HDF5 Data Structure:
+   - Direct joint names: hip_flexion_r, hip_adduction_r, hip_rotation_r
+   - Already in OpenSim convention
+   - Values in DEGREES (need to convert to radians)
+
+5. MyoSuite/MyoAssist Joint Convention:
+   - Check if MyoSuite follows OpenSim joint definitions
+   - Or if there's sign/axis flip needed
+
+Next Steps:
+1. Check MuJoCo model XML joint definitions
+2. Compare HDF5 joint directions with MyoAssist expectations
+3. Apply NPZ converter's coordinate transform to HDF5
+4. Test sign conventions for hip joints
+"""

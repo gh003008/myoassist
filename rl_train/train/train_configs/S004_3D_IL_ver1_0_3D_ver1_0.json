@@ -1,0 +1,103 @@
+{
+  "total_timesteps": 30000000.0,
+  "evaluate_param_list": [
+    {
+      "num_timesteps": 200,
+      "min_target_velocity": 0.8,
+      "max_target_velocity": 0.8,
+      "target_velocity_period": 2,
+      "velocity_mode": "UNIFORM"
+    }
+  ],
+  "num_envs": 8,
+  "n_steps": 1024,
+  "learning_rate": 0.0001,
+  "device": "cpu",
+  "env_params": {
+    "env_id": "myoAssistLegImitationExo-v0",
+    "model_path": "models/26muscle_3D/myoLeg26_BASELINE.xml",
+    "reference_data_path": "rl_train/reference_data/S004_trial01_08mps_3D.npz",
+    "reference_data_keys": [
+      "ankle_angle_l",
+      "ankle_angle_r",
+      "hip_flexion_l",
+      "hip_flexion_r",
+      "hip_adduction_l",
+      "hip_adduction_r",
+      "hip_rotation_l",
+      "hip_rotation_r",
+      "knee_angle_l",
+      "knee_angle_r",
+      "pelvis_list",
+      "pelvis_tilt",
+      "pelvis_rotation",
+      "pelvis_tx",
+      "pelvis_ty",
+      "pelvis_tz"
+    ],
+    "flag_random_ref_index": false,
+    "out_of_trajectory_threshold": 0.3,
+    "prev_trained_policy_path": null,
+    "reward_keys_and_weights": {
+      "qpos_imitation_rewards": {
+        "pelvis_tx": 0.1,
+        "pelvis_ty": 0.1,
+        "pelvis_tz": 0.1,
+        "pelvis_list": 0.5,
+        "pelvis_tilt": 1.0,
+        "pelvis_rotation": 0.5,
+        "hip_flexion_l": 0.5,
+        "hip_flexion_r": 0.5,
+        "hip_adduction_l": 0.3,
+        "hip_adduction_r": 0.3,
+        "hip_rotation_l": 0.3,
+        "hip_rotation_r": 0.3,
+        "knee_angle_l": 1.0,
+        "knee_angle_r": 1.0,
+        "ankle_angle_l": 0.2,
+        "ankle_angle_r": 0.2
+      },
+      "qvel_imitation_rewards": {
+        "pelvis_tx": 0.1,
+        "pelvis_ty": 0.1,
+        "pelvis_tz": 0.1,
+        "pelvis_list": 0.1,
+        "pelvis_tilt": 0.1,
+        "pelvis_rotation": 0.1,
+        "hip_flexion_l": 0.2,
+        "hip_flexion_r": 0.2,
+        "hip_adduction_l": 0.1,
+        "hip_adduction_r": 0.1,
+        "hip_rotation_l": 0.1,
+        "hip_rotation_r": 0.1,
+        "knee_angle_l": 0.1,
+        "knee_angle_r": 0.1,
+        "ankle_angle_l": 0.1,
+        "ankle_angle_r": 0.1
+      }
+    }
+  },
+  "policy_params": {
+    "network_architecture": {
+      "human_actor": [
+        128,
+        128
+      ],
+      "exo_actor": [
+        16,
+        16
+      ],
+      "common_critic": [
+        128,
+        128
+      ]
+    }
+  },
+  "logger_params": {
+    "logging_frequency": 10,
+    "evaluate_frequency": 50
+  },
+  "auto_reward_adjust_params": {
+    "learning_rate": 0.0
+  }
+}

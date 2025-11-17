@@ -131,5 +131,6 @@ osl.log
 rl_train/train_logs/
 rl_train/results/
 cma_dump/
+wandb/
 
 train_bash_script.md
