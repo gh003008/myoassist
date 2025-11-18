@@ -185,11 +185,13 @@ class MyoAssistLegImitation_ver2_1(MyoAssistLegImitation):
         Fixes issue where reference velocity can be zero at initialization.
         """
         # Get reference velocity with epsilon to prevent divide-by-zero
-        ref_velocity = self._reference_data["series_data"]["dq_pelvis_tx"][self._imitation_index]
+        # Access series_data without "q_" prefix (dpelvis_tx instead of dq_pelvis_tx)
+        ref_velocity = self._reference_data["series_data"]["dpelvis_tx"][self._imitation_index]
         speed_ratio_to_target_velocity = self._target_velocity / (ref_velocity + 1e-8)
 
         def get_qvel_diff_one(key:str):
-            diff = self.sim.data.joint(f"{key}").qvel[0].copy() - self._reference_data["series_data"][f"dq_{key}"][self._imitation_index] * speed_ratio_to_target_velocity
+            # Access series_data without "q_" prefix (already removed in environment_handler)
+            diff = self.sim.data.joint(f"{key}").qvel[0].copy() - self._reference_data["series_data"][f"d{key}"][self._imitation_index] * speed_ratio_to_target_velocity
             return diff
         
         name_diff_dict = {}
@@ -203,16 +205,19 @@ class MyoAssistLegImitation_ver2_1(MyoAssistLegImitation):
         251117_Ver2_1: Override to handle divide-by-zero in velocity setting
         
         Fixes issue where reference velocity can be zero at initialization.
+        Reverted to simple implementation - works with existing pipeline.
         """
-        # Set positions
+        # Original simple implementation
         for key in self.reference_data_keys:
-            self.sim.data.joint(f"{key}").qpos = self._reference_data["series_data"][f"q_{key}"][self._imitation_index]
+            # Access series_data without "q_" prefix (environment_handler removes it)
+            self.sim.data.joint(f"{key}").qpos = self._reference_data["series_data"][f"{key}"][self._imitation_index]
             if not is_x_follow and key == 'pelvis_tx':
                 self.sim.data.joint(f"{key}").qpos = 0
         
         # Set velocities with epsilon to prevent divide-by-zero
-        ref_velocity = self._reference_data["series_data"]["dq_pelvis_tx"][self._imitation_index]
+        ref_velocity = self._reference_data["series_data"]["dpelvis_tx"][self._imitation_index]
         speed_ratio_to_target_velocity = self._target_velocity / (ref_velocity + 1e-8)
         
         for key in self.reference_data_keys:
-            self.sim.data.joint(f"{key}").qvel = self._reference_data["series_data"][f"dq_{key}"][self._imitation_index] * speed_ratio_to_target_velocity
+            # Access series_data without "q_" prefix
+            self.sim.data.joint(f"{key}").qvel = self._reference_data["series_data"][f"d{key}"][self._imitation_index] * speed_ratio_to_target_velocity

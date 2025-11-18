@@ -5,6 +5,7 @@ from myosuite.utils import gym
 from rl_train.utils.data_types import DictionableDataclass
 import os
 from rl_train.train.train_configs.config import TrainSessionConfigBase
+
 class EnvironmentHandler:
     @staticmethod
     def create_environment(config, is_rendering_on:bool, is_evaluate_mode:bool = False):
@@ -66,14 +67,86 @@ class EnvironmentHandler:
                     ref_data_dict[key] = data.item()
                 else:
                     ref_data_dict[key] = data
+            
+            # COMPATIBILITY: Handle two data formats
+            # Format A: MuJoCo renderer format (q_ref, joint_names with q_ prefix)
+            # Format B: Environment format (series_data, metadata without q_ prefix)
+            
+            if 'series_data' in ref_data_dict and 'metadata' in ref_data_dict:
+                # Format B: Already in environment format - no conversion needed!
+                print("✅ Detected ENVIRONMENT format (series_data, metadata)")
+                print("   NO conversion needed - data already in correct format!")
+                
+                # CRITICAL: Apply pelvis_ty offset for environment format too!
+                # Environment format NPZ has ground-relative pelvis_ty
+                # Need to add +0.91m offset to match MuJoCo "stand" keyframe height
+                if 'pelvis_ty' in ref_data_dict['series_data']:
+                    ref_data_dict['series_data']['pelvis_ty'] = ref_data_dict['series_data']['pelvis_ty'] + 0.91
+                    print(f"   ⚠️  Applied pelvis_ty offset: +0.91m (ground-relative → MuJoCo model height)")
+                
+            elif 'q_ref' in ref_data_dict and 'joint_names' in ref_data_dict:
+                # Format A: MuJoCo renderer format - needs conversion
+                print("📦 Detected MUJOCO RENDERER format (q_ref, joint_names with q_ prefix)")
+                print("   Converting to environment format (series_data, metadata)...")
+                
+                q_ref = ref_data_dict['q_ref']
+                joint_names = ref_data_dict['joint_names']
+                
+                # Create series_data dict
+                series_data = {}
+                for i, joint_name in enumerate(joint_names):
+                    joint_name_str = str(joint_name)
+                    
+                    # CRITICAL: Environment expects joint names WITHOUT "q_" prefix
+                    # HDF5 has "q_hip_flexion_r", environment uses "hip_flexion_r"
+                    # Remove "q_" prefix if present
+                    if joint_name_str.startswith('q_'):
+                        env_joint_name = joint_name_str[2:]  # Remove "q_" prefix
+                    else:
+                        env_joint_name = joint_name_str
+                    
+                    # CRITICAL: HDF5 data has pelvis_ty relative to ground (0.0)
+                    # MuJoCo model expects pelvis_ty relative to "stand" keyframe (~0.91m)
+                    # Add offset to match model's coordinate system
+                    if env_joint_name == 'pelvis_ty':
+                        # Add 0.91m offset to lift pelvis to standing height
+                        series_data[env_joint_name] = q_ref[:, i] + 0.91
+                        print(f"   ⚠️  Applied pelvis_ty offset: +0.91m (HDF5 ground-relative → MuJoCo model height)")
+                    else:
+                        series_data[env_joint_name] = q_ref[:, i]
+                    
+                    # Velocity data (approximate with finite difference)
+                    dq = np.gradient(q_ref[:, i], axis=0) * 100  # 100 Hz sampling
+                    series_data[f'd{env_joint_name}'] = dq
+                
+                # Create metadata
+                # Create metadata
+                metadata = {
+                    'data_length': q_ref.shape[0],
+                    'sample_rate': 100,  # HDF5 converted data is 100 Hz
+                    'dof': q_ref.shape[1],
+                    'model_type': '3D',
+                    'resampled_data_length': q_ref.shape[0],  # Initially same as original
+                    'resampled_sample_rate': 100,  # Initially 100 Hz
+                }
+                
+                # Replace with converted format
+                ref_data_dict = {
+                    'series_data': series_data,
+                    'metadata': metadata
+                }
+                print(f"   ✅ Converted {q_ref.shape[0]} frames, {q_ref.shape[1]} DOF @ 100 Hz")
+                
         elif config.env_params.reference_data_path.endswith(".json"):
             with open(config.env_params.reference_data_path, 'r') as f:
                 ref_data_dict = json.load(f)
         else:
             raise ValueError("Unsupported file format. Please use either .npz or .json.")
 
-        if "resampled_series_data" not in ref_data_dict:
-            ref_data_dict["resampled_series_data"] = {}
+        # CRITICAL: Only resample if control_framerate != sample_rate
+        # Check if resampling is needed
+        if ref_data_dict["metadata"]["sample_rate"] != config.env_params.control_framerate:
+            print(f"   🔄 Resampling from {ref_data_dict['metadata']['sample_rate']} Hz to {config.env_params.control_framerate} Hz...")
             for key in ref_data_dict["series_data"].keys():
                 original_data_length = len(ref_data_dict["series_data"][key])
                 original_sample_rate = ref_data_dict["metadata"]["sample_rate"]
@@ -83,8 +156,17 @@ class EnvironmentHandler:
                 new_length = int(original_data_length * new_sample_rate / original_sample_rate)
                 new_x = np.linspace(0, original_data_length - 1, new_length)
                 ref_data_dict["series_data"][key] = np.interp(new_x, original_x, ref_data_dict["series_data"][key])
-                ref_data_dict["metadata"]["resampled_data_length"] = new_length
-                ref_data_dict["metadata"]["resampled_sample_rate"] = new_sample_rate
+            
+            ref_data_dict["metadata"]["resampled_data_length"] = new_length
+            ref_data_dict["metadata"]["resampled_sample_rate"] = new_sample_rate
+            print(f"   ✅ Resampled to {new_length} frames @ {new_sample_rate} Hz")
+        else:
+            # No resampling needed - already at correct rate
+            print(f"   ℹ️  No resampling needed (already @ {config.env_params.control_framerate} Hz)")
+            if "resampled_data_length" not in ref_data_dict["metadata"]:
+                ref_data_dict["metadata"]["resampled_data_length"] = ref_data_dict["metadata"]["data_length"]
+            if "resampled_sample_rate" not in ref_data_dict["metadata"]:
+                ref_data_dict["metadata"]["resampled_sample_rate"] = ref_data_dict["metadata"]["sample_rate"]
 
         return ref_data_dict
 
@@ -118,34 +200,19 @@ class EnvironmentHandler:
         """
         Get callback for training
         
-        Automatically selects the appropriate callback based on env_id:
-        - ver2_1: Uses ImitationCustomLearningCallback_ver2_1 (with WandB if configured)
-        - ver1_0/ver1_1: Uses ImitationCustomLearningCallback_ver1_0 (with WandB if configured)
-        - Other: Uses base callback
-        
         Args:
-            use_ver1_0: Legacy flag for backward compatibility
-            wandb_config: WandB configuration dict. If provided, enables WandB logging
+            use_ver1_0: If True, use ver1_0 callback with WandB integration
+            wandb_config: WandB configuration dict (only used if use_ver1_0=True)
         """
         from rl_train.train.train_configs.config_imitation import ImitationTrainSessionConfig
+        
         from rl_train.utils import learning_callback
         
         if isinstance(config, ImitationTrainSessionConfig):
-            # Determine version from env_id
-            env_id = config.env_params.env_id
-            
-            if 'v2_1' in env_id or use_ver1_0 or wandb_config is not None:
-                # Ver2_1 or WandB enabled: Use enhanced callback
-                if 'v2_1' in env_id:
-                    from rl_train.envs.myoassist_leg_imitation_ver2_1 import ImitationCustomLearningCallback_ver2_1
-                    callback_class = ImitationCustomLearningCallback_ver2_1
-                    version_name = "ver2_1"
-                else:
-                    from rl_train.envs.myoassist_leg_imitation_ver1_0 import ImitationCustomLearningCallback_ver1_0
-                    callback_class = ImitationCustomLearningCallback_ver1_0
-                    version_name = "ver1_0"
-                
-                custom_callback = callback_class(
+            if use_ver1_0:
+                # ver1_0: Use enhanced callback with WandB
+                from rl_train.envs.myoassist_leg_imitation_ver1_0 import ImitationCustomLearningCallback_ver1_0
+                custom_callback = ImitationCustomLearningCallback_ver1_0(
                     log_rollout_freq=config.logger_params.logging_frequency,
                     evaluate_freq=config.logger_params.evaluate_frequency,
                     log_handler=train_log_handler,
@@ -154,13 +221,9 @@ class EnvironmentHandler:
                     config=config,
                     wandb_config=wandb_config,
                 )
-                
-                if wandb_config:
-                    print(f"✅ Using {version_name} callback with WandB logging")
-                else:
-                    print(f"✅ Using {version_name} callback (WandB not configured)")
+                print("✅ Using ver1_0 callback (WandB + 10% evaluation)")
             else:
-                # Original callback without WandB
+                # Original callback
                 from rl_train.envs import myoassist_leg_imitation
                 custom_callback = myoassist_leg_imitation.ImitationCustomLearningCallback(
                     log_rollout_freq=config.logger_params.logging_frequency,
@@ -169,7 +232,6 @@ class EnvironmentHandler:
                     original_reward_weights=config.env_params.reward_keys_and_weights,
                     auto_reward_adjust_params=config.auto_reward_adjust_params,
                 )
-                print("⚠️  Using base callback - WandB logging disabled")
         else:
             custom_callback = learning_callback.BaseCustomLearningCallback(
                 log_rollout_freq=config.logger_params.logging_frequency,

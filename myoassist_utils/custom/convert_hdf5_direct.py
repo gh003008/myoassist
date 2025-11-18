@@ -11,7 +11,7 @@ import os
 # CONFIG
 # ============================================================================
 CONFIG = {
-    'input_hdf5': r'C:\workspace_home\opensim data\LD\S004.h5',
+    'input_hdf5': r'C:\workspace\opensim data\LD\S004.h5',
     'subject': 'S004',
     'speed': '08mps',
     'trial': 'trial_01',

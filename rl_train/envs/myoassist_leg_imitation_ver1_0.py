@@ -191,8 +191,9 @@ class ImitationCustomLearningCallback_ver1_0(BaseCustomLearningCallback):
             obs, reward, done, truncated, info = eval_env.step(action)
             episode_reward += reward
             
-            # 프레임 캡처 (2프레임마다, 30Hz → 15fps)
-            if video_enabled and step % 2 == 0:
+            # 프레임 캡처 (매 프레임, 100 FPS = 실시간 속도)
+            # MuJoCo timestep = 0.01s → 100 steps/sec = 100 FPS for real-time
+            if video_enabled:
                 try:
                     frame = eval_env.render()
                     if frame is not None:
@@ -213,9 +214,11 @@ class ImitationCustomLearningCallback_ver1_0(BaseCustomLearningCallback):
             video_path = os.path.join(eval_dir, video_filename)
             print(f"💾 비디오 저장 중... ({len(frames)} 프레임)")
             try:
-                imageio.mimsave(video_path, frames, fps=15)
+                # 100 FPS = 실시간 속도 (MuJoCo timestep = 0.01s = 100 Hz)
+                imageio.mimsave(video_path, frames, fps=100)
                 print(f"🎬 비디오 저장: {video_path}")
-                print(f"   📹 재생 속도: 15 fps (천천히 보기 편함)")
+                print(f"   📹 재생 속도: 100 fps (실시간)")
+                print(f"   ⏱️  비디오 길이: {len(frames)/100:.1f}초")
             except Exception as e:
                 print(f"⚠️ 비디오 저장 실패: {e}")
         
@@ -373,17 +376,20 @@ class MyoAssistLegImitation(MyoAssistLegBase):
     def _get_qpos_diff(self) -> dict:
 
         def get_qpos_diff_one(key:str):
-            diff = self.sim.data.joint(f"{key}").qpos[0].copy() - self._reference_data["series_data"][f"q_{key}"][self._imitation_index]
+            # Access series_data without "q_" prefix (already removed in environment_handler)
+            diff = self.sim.data.joint(f"{key}").qpos[0].copy() - self._reference_data["series_data"][f"{key}"][self._imitation_index]
             return diff
         name_diff_dict = {}
         for q_key in self._reward_keys_and_weights.qpos_imitation_rewards:
             name_diff_dict[q_key] = get_qpos_diff_one(q_key)
         return name_diff_dict
     def _get_qvel_diff(self):
-        speed_ratio_to_target_velocity = self._target_velocity / self._reference_data["series_data"]["dq_pelvis_tx"][self._imitation_index]
+        # Access series_data without "q_" prefix (dpelvis_tx instead of dq_pelvis_tx)
+        speed_ratio_to_target_velocity = self._target_velocity / self._reference_data["series_data"]["dpelvis_tx"][self._imitation_index]
 
         def get_qvel_diff_one(key:str):
-            diff = self.sim.data.joint(f"{key}").qvel[0].copy() - self._reference_data["series_data"][f"dq_{key}"][self._imitation_index] * speed_ratio_to_target_velocity
+            # Access series_data without "q_" prefix (already removed in environment_handler)
+            diff = self.sim.data.joint(f"{key}").qvel[0].copy() - self._reference_data["series_data"][f"d{key}"][self._imitation_index] * speed_ratio_to_target_velocity
             return diff
         name_diff_dict = {}
         for q_key in self._reward_keys_and_weights.qvel_imitation_rewards:
@@ -461,15 +467,18 @@ class MyoAssistLegImitation(MyoAssistLegBase):
     
 
     def _follow_reference_motion(self, is_x_follow:bool):
+        # Original simple implementation - works with existing pipeline
         for key in self.reference_data_keys:
-            self.sim.data.joint(f"{key}").qpos = self._reference_data["series_data"][f"q_{key}"][self._imitation_index]
+            # Access series_data without "q_" prefix (environment_handler removes it)
+            self.sim.data.joint(f"{key}").qpos = self._reference_data["series_data"][f"{key}"][self._imitation_index]
             if not is_x_follow and key == 'pelvis_tx':
                 self.sim.data.joint(f"{key}").qpos = 0
-            # if key == 'pelvis_ty':
-            #     self.sim.data.joint(f"{key}").qpos += 0.05
-        speed_ratio_to_target_velocity = self._target_velocity / self._reference_data["series_data"]["dq_pelvis_tx"][self._imitation_index]
+        
+        # Access series_data without "q_" prefix (dpelvis_tx instead of dq_pelvis_tx)
+        speed_ratio_to_target_velocity = self._target_velocity / self._reference_data["series_data"]["dpelvis_tx"][self._imitation_index]
         for key in self.reference_data_keys:
-            self.sim.data.joint(f"{key}").qvel = self._reference_data["series_data"][f"dq_{key}"][self._imitation_index] * speed_ratio_to_target_velocity
+            # Access series_data without "q_" prefix
+            self.sim.data.joint(f"{key}").qvel = self._reference_data["series_data"][f"d{key}"][self._imitation_index] * speed_ratio_to_target_velocity
     def imitation_step(self, is_x_follow:bool, specific_index:int|None = None):
         if specific_index is None:
             self._imitation_index += 1

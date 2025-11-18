@@ -8,7 +8,7 @@ import mujoco
 import imageio
 from pathlib import Path
 
-def render_reference_motion(npz_path, model_path, output_path, num_frames=300, height_offset=0.95, fps=30, multiview=False):
+def render_reference_motion(npz_path, model_path, output_path, num_frames=300, height_offset=0.95, fps=100, multiview=False):
     """Render reference motion from NPZ file
     
     Args:
@@ -149,20 +149,21 @@ def render_reference_motion(npz_path, model_path, output_path, num_frames=300, h
         camera_front = mujoco.MjvCamera()
         mujoco.mjv_defaultFreeCamera(model, camera_front)
         camera_front.azimuth = 90      # Front view
-        camera_front.elevation = -10   # Slightly above
-        camera_front.distance = 4.0
-        camera_front.lookat[:] = [0, 0.5, 0]
+        camera_front.elevation = -15   # Slightly above
+        camera_front.distance = 4.5
+        camera_front.lookat[:] = [0, 0.7, 0]
         
         # Side view camera
         camera_side = mujoco.MjvCamera()
         mujoco.mjv_defaultFreeCamera(model, camera_side)
-        camera_side.azimuth = 0        # Side view (sagittal plane)
-        camera_side.elevation = -10
-        camera_side.distance = 4.0
-        camera_side.lookat[:] = [0, 0.5, 0]
+        camera_side.azimuth = 180        # Side view (sagittal plane)
+        camera_side.elevation = -20
+        # camera_side.elevation = -10
+        camera_side.distance = 3.0
+        camera_side.lookat[:] = [0, 0.4, 0]
         
         print(f'  Front view: azimuth=90° (frontal plane)')
-        print(f'  Side view:  azimuth=0° (sagittal plane)')
+        print(f'  Side view:  azimuth=180° (sagittal plane)')
     else:
         # Diagonal view camera
         camera_diagonal = mujoco.MjvCamera()
@@ -178,6 +179,14 @@ def render_reference_motion(npz_path, model_path, output_path, num_frames=300, h
     scene_option = mujoco.MjvOption()
     scene_option.flags[mujoco.mjtVisFlag.mjVIS_TRANSPARENT] = True  # Enable transparency
     scene_option.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = False  # Hide contact points
+    
+    # Make floor transparent
+    for i in range(model.ngeom):
+        geom_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, i)
+        if geom_name and 'floor' in geom_name.lower():
+            # Set floor to semi-transparent (alpha = 0.3)
+            model.geom_rgba[i, 3] = 0.3
+            print(f'  Floor transparency set: {geom_name} (alpha=0.3)')
     
     # Hide arm geoms (visual only - arms still in simulation)
     arm_body_names = ['humerus_r', 'ulna_r', 'radius_r', 'hand_r',
@@ -202,7 +211,7 @@ def render_reference_motion(npz_path, model_path, output_path, num_frames=300, h
             # Set geom rgba to fully transparent
             model.geom_rgba[i, 3] = 0.0  # Alpha = 0 (invisible)
     
-    print(f'  Transparency: Enabled (can see through floor)')
+    print(f'  Transparency: Enabled (floor alpha=0.3, arms hidden)')
     
     # Render frames
     print(f'\nRendering {num_frames} frames...')
@@ -251,12 +260,14 @@ def render_reference_motion(npz_path, model_path, output_path, num_frames=300, h
             # Render front view (left half: 960px)
             renderer.update_scene(data_mj, camera=camera_front, scene_option=scene_option)
             pixels_front = renderer.render()
-            front_half = pixels_front[:, :960]  # Left 960 pixels
-            
+            # front_half = pixels_front[:, :960]  # Left 960 pixels
+            front_half = pixels_front[:, 480:1440]  # 중앙 960픽셀
+
             # Render side view (right half: 960px)
             renderer.update_scene(data_mj, camera=camera_side, scene_option=scene_option)
             pixels_side = renderer.render()
-            side_half = pixels_side[:, :960]  # Left 960 pixels
+            # side_half = pixels_side[:, :960]  # Left 960 pixels
+            side_half = pixels_side[:, 480:1440]    # 중앙 960픽셀
             
             # Concatenate horizontally (960 + 960 = 1920)
             pixels = np.concatenate([front_half, side_half], axis=1)
