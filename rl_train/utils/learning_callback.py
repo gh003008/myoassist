@@ -20,12 +20,15 @@ class BaseCustomLearningCallback(BaseCallback):
                  log_rollout_freq: int,
                  evaluate_freq: int,
                  log_handler:train_log_handler.TrainLogHandler,
+                 total_timesteps: int = 0,
                  verbose=1):
         super().__init__(verbose)
         self.log_rollout_freq = log_rollout_freq
         self.evaluate_freq = evaluate_freq
         self.train_log_handler:train_log_handler.TrainLogHandler = log_handler
         self.log_count = 0
+        self.total_timesteps = total_timesteps  # For progress calculation
+        self._first_percent_video_saved = False  # Track if 1% video saved
         
         # Move the analyze_process function to class level
         # self.analyze_process = functools.partial(_analyze_process)
@@ -89,6 +92,27 @@ class BaseCustomLearningCallback(BaseCallback):
         super()._on_rollout_end()
 
         self.prev_logging_timestep = self.num_timesteps
+        
+        # 🎬 NEW: Check if we've reached 1% progress and haven't saved video yet
+        if self.total_timesteps > 0 and not self._first_percent_video_saved:
+            progress = (self.num_timesteps / self.total_timesteps) * 100
+            if progress >= 1.0:
+                self._first_percent_video_saved = True  # Set flag FIRST to prevent re-entry
+                
+                print("\n" + "="*80)
+                print("🎥 1% PROGRESS REACHED - Saving early training video...")
+                print(f"   Current timesteps: {self.num_timesteps:,} / {self.total_timesteps:,}")
+                print("="*80 + "\n")
+                
+                # Run evaluation video (no model saving needed)
+                try:
+                    _analyze_process(self.train_log_handler.log_dir)
+                    print(f"✅ Early training video saved successfully!")
+                    print("="*80 + "\n")
+                except Exception as e:
+                    print(f"⚠️  Failed to save 1% video: {e}")
+                    print("   (This won't affect training, videos will still be saved at 10% intervals)")
+                    print("="*80 + "\n")
         
         log_data = None
         if self.log_count % self.log_rollout_freq == 0:

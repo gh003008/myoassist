@@ -32,7 +32,7 @@ class TrainAnalyzer:
 
             if config.env_params.env_id == 'myoAssistLeg-v0':
                 config = DictionableDataclass.create(TrainSessionConfigBase, config_dict)
-            elif config.env_params.env_id in ['myoAssistLegImitation-v0', 'myoAssistLegImitationExo-v0']:
+            elif config.env_params.env_id in ['myoAssistLegImitation-v0', 'myoAssistLegImitationExo-v0', 'myoAssistLegImitationExo-v2_1']:
                 # print("Imitation train session config")
                 config = DictionableDataclass.create(ImitationTrainSessionConfig, config_dict)
                 # print("\nAll fields in RewardWeights:")

@@ -73,16 +73,41 @@ class EnvironmentHandler:
             # Format B: Environment format (series_data, metadata without q_ prefix)
             
             if 'series_data' in ref_data_dict and 'metadata' in ref_data_dict:
-                # Format B: Already in environment format - no conversion needed!
+                # Format B: Already in environment format
                 print("✅ Detected ENVIRONMENT format (series_data, metadata)")
-                print("   NO conversion needed - data already in correct format!")
                 
-                # CRITICAL: Apply pelvis_ty offset for environment format too!
+                # CRITICAL: Check if series_data has q_ prefix and remove it!
+                # Some environment format files still have q_ prefix in keys
+                series_data = ref_data_dict['series_data']
+                first_key = list(series_data.keys())[0]
+                
+                if first_key.startswith('q_') or first_key.startswith('dq_'):
+                    print("   ⚠️  Detected q_ prefix in environment format keys - removing...")
+                    new_series_data = {}
+                    for key, value in series_data.items():
+                        if key.startswith('q_'):
+                            new_key = key[2:]  # Remove 'q_'
+                        elif key.startswith('dq_'):
+                            new_key = 'd' + key[3:]  # 'dq_pelvis_tx' → 'dpelvis_tx'
+                        else:
+                            new_key = key
+                        new_series_data[new_key] = value
+                    ref_data_dict['series_data'] = new_series_data
+                    print(f"   ✅ Removed q_ prefix from {len(new_series_data)} keys")
+                else:
+                    print("   NO prefix removal needed - keys already clean!")
+                
+                # CRITICAL: Apply pelvis_ty offset for environment format!
                 # Environment format NPZ has ground-relative pelvis_ty
                 # Need to add +0.91m offset to match MuJoCo "stand" keyframe height
                 if 'pelvis_ty' in ref_data_dict['series_data']:
                     ref_data_dict['series_data']['pelvis_ty'] = ref_data_dict['series_data']['pelvis_ty'] + 0.91
                     print(f"   ⚠️  Applied pelvis_ty offset: +0.91m (ground-relative → MuJoCo model height)")
+                elif 'q_pelvis_ty' in ref_data_dict['series_data']:
+                    # Shouldn't happen after prefix removal, but just in case
+                    ref_data_dict['series_data']['pelvis_ty'] = ref_data_dict['series_data']['q_pelvis_ty'] + 0.91
+                    del ref_data_dict['series_data']['q_pelvis_ty']
+                    print(f"   ⚠️  Applied pelvis_ty offset: +0.91m (found q_pelvis_ty, converted to pelvis_ty)")
                 
             elif 'q_ref' in ref_data_dict and 'joint_names' in ref_data_dict:
                 # Format A: MuJoCo renderer format - needs conversion
@@ -220,8 +245,9 @@ class EnvironmentHandler:
                     auto_reward_adjust_params=config.auto_reward_adjust_params,
                     config=config,
                     wandb_config=wandb_config,
+                    total_timesteps=config.total_timesteps,  # For 1% progress video
                 )
-                print("✅ Using ver1_0 callback (WandB + 10% evaluation)")
+                print("✅ Using ver1_0 callback (WandB + 10% evaluation + 1% early video)")
             else:
                 # Original callback
                 from rl_train.envs import myoassist_leg_imitation
@@ -231,12 +257,14 @@ class EnvironmentHandler:
                     log_handler=train_log_handler,
                     original_reward_weights=config.env_params.reward_keys_and_weights,
                     auto_reward_adjust_params=config.auto_reward_adjust_params,
+                    total_timesteps=config.total_timesteps,  # For 1% progress video
                 )
         else:
             custom_callback = learning_callback.BaseCustomLearningCallback(
                 log_rollout_freq=config.logger_params.logging_frequency,
                 evaluate_freq=config.logger_params.evaluate_frequency,
                 log_handler=train_log_handler,
+                total_timesteps=config.total_timesteps,  # For 1% progress video
             )
 
         return custom_callback
