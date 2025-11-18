@@ -83,45 +83,45 @@
         
         "reward_keys_and_weights": {
             "qpos_imitation_rewards": {
-                "pelvis_tx": 1.0,
-                "pelvis_ty": 2.0,
+                "pelvis_tx": 0.1,
+                "pelvis_ty": 3.0,
                 "pelvis_tz": 3.0,
+                "pelvis_list": 2.0,
+                "pelvis_tilt": 2.0,
+                "pelvis_rotation": 2.0,
+                "hip_flexion_l": 1.5,
+                "hip_flexion_r": 1.5,
+                "hip_adduction_l": 1.0,
+                "hip_adduction_r": 1.0,
+                "hip_rotation_l": 0.8,
+                "hip_rotation_r": 0.8,
+                "knee_angle_l": 2.0,
+                "knee_angle_r": 2.0,
+                "ankle_angle_l": 0.5,
+                "ankle_angle_r": 0.5
+            },
+            "qvel_imitation_rewards": {
+                "pelvis_tx": 0.05,
+                "pelvis_ty": 1.5,
+                "pelvis_tz": 1.5,
                 "pelvis_list": 0.5,
-                "pelvis_tilt": 1.0,
+                "pelvis_tilt": 0.5,
                 "pelvis_rotation": 0.5,
                 "hip_flexion_l": 0.5,
                 "hip_flexion_r": 0.5,
                 "hip_adduction_l": 0.3,
                 "hip_adduction_r": 0.3,
-                "hip_rotation_l": 0.3,
-                "hip_rotation_r": 0.3,
-                "knee_angle_l": 1.0,
-                "knee_angle_r": 1.0,
+                "hip_rotation_l": 0.2,
+                "hip_rotation_r": 0.2,
+                "knee_angle_l": 0.5,
+                "knee_angle_r": 0.5,
                 "ankle_angle_l": 0.2,
                 "ankle_angle_r": 0.2
             },
-            "qvel_imitation_rewards": {
-                "pelvis_tx": 1.0,
-                "pelvis_ty": 1.0,
-                "pelvis_tz": 1.0,
-                "pelvis_list": 0.1,
-                "pelvis_tilt": 0.1,
-                "pelvis_rotation": 0.1,
-                "hip_flexion_l": 0.2,
-                "hip_flexion_r": 0.2,
-                "hip_adduction_l": 0.1,
-                "hip_adduction_r": 0.1,
-                "hip_rotation_l": 0.1,
-                "hip_rotation_r": 0.1,
-                "knee_angle_l": 0.1,
-                "knee_angle_r": 0.1,
-                "ankle_angle_l": 0.1,
-                "ankle_angle_r": 0.1
-            },
             "end_effector_imitation_reward": 0.0,
-            "forward_reward": 0.2,
-            "muscle_activation_penalty": 0.1,
-            "muscle_activation_diff_penalty": 0.1,
+            "forward_reward": 0.05,
+            "muscle_activation_penalty": 0.2,
+            "muscle_activation_diff_penalty": 0.15,
 
             "footstep_delta_time": 0.0,
             "average_velocity_per_step": 0.0,
@@ -129,11 +129,11 @@
 
             "joint_constraint_force_penalty": 0.0,
 
-            "foot_force_penalty": 0.5,
+            "foot_force_penalty": 0.3,
 
-            "_comment_Ver2_1": "Ver2_0 Karico + 3D balancing rewards",
-            "pelvis_list_penalty": 0.1,
-            "pelvis_height_reward": 0.02
+            "_comment_Ver2_1_treadmill": "Treadmill-optimized: low pelvis_tx, high pelvis orientation stability, controlled leg movement",
+            "pelvis_list_penalty": 0.5,
+            "pelvis_height_reward": 0.05
         },
         "custom_max_episode_steps": 1000,
         "prev_trained_policy_path": null,
@@ -291,5 +291,5 @@
     "auto_reward_adjust_params":{
         "learning_rate": 0.0
     },
-    "_comment_Ver2_1": "251117 - Ver2_0 Karico + 3D balancing rewards (pelvis_list_penalty, pelvis_height_reward, rotation_based_termination). Uses HDF5_v7 reference motion."
+    "_comment_Ver2_1_treadmill": "251118 - Treadmill-optimized Ver2_1: pelvis_tx=0.1 (no forward movement), high pelvis orientation weights (2.0), increased leg joint weights (hip_flexion=1.5, knee=2.0), stronger pelvis_list_penalty (0.5) for stability. Uses HDF5_v7 reference motion."
 }

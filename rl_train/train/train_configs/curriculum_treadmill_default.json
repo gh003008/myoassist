@@ -1,0 +1,68 @@
+{
+    "_comment": "Curriculum Learning Configuration for Treadmill Walking",
+    "_description": "4-stage curriculum: Foundation → Stabilization → Target → Robustness",
+    
+    "stages": [
+        {
+            "stage_id": 1,
+            "name": "Foundation",
+            "timesteps": 5000000,
+            "target_velocity_range": [0.4, 0.5],
+            "max_episode_steps": 300,
+            "reward_weights": {
+                "pelvis_list": 3.0,
+                "pelvis_tilt": 3.0,
+                "pelvis_rotation": 3.0,
+                "pelvis_list_penalty": 0.8,
+                "pelvis_height_reward": 0.1,
+                "hip_flexion_l": 1.0,
+                "hip_flexion_r": 1.0,
+                "knee_angle_l": 1.5,
+                "knee_angle_r": 1.5
+            },
+            "description": "Learn basic stability and slow walking (0.4~0.5 m/s)"
+        },
+        {
+            "stage_id": 2,
+            "name": "Stabilization",
+            "timesteps": 8000000,
+            "target_velocity_range": [0.5, 0.7],
+            "max_episode_steps": 600,
+            "reward_weights": {
+                "pelvis_list": 2.0,
+                "pelvis_tilt": 2.0,
+                "pelvis_rotation": 2.0,
+                "pelvis_list_penalty": 0.5,
+                "pelvis_height_reward": 0.05,
+                "hip_flexion_l": 1.5,
+                "hip_flexion_r": 1.5,
+                "hip_adduction_l": 1.0,
+                "hip_adduction_r": 1.0,
+                "knee_angle_l": 2.0,
+                "knee_angle_r": 2.0
+            },
+            "description": "Increase speed and refine balance (0.5~0.7 m/s)"
+        },
+        {
+            "stage_id": 3,
+            "name": "Target Performance",
+            "timesteps": 10000000,
+            "target_velocity_range": [0.7, 0.8],
+            "max_episode_steps": 1000,
+            "reward_weights": null,
+            "description": "Achieve target walking speed (0.7~0.8 m/s)"
+        },
+        {
+            "stage_id": 4,
+            "name": "Robustness",
+            "timesteps": 7000000,
+            "target_velocity_range": [0.6, 0.9],
+            "max_episode_steps": 1000,
+            "reward_weights": {
+                "forward_reward": 0.1,
+                "muscle_activation_penalty": 0.15
+            },
+            "description": "Adapt to variable speeds for robustness (0.6~0.9 m/s)"
+        }
+    ]
+}
