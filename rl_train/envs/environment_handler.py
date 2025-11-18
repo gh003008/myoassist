@@ -109,6 +109,12 @@ class EnvironmentHandler:
                     del ref_data_dict['series_data']['q_pelvis_ty']
                     print(f"   ⚠️  Applied pelvis_ty offset: +0.91m (found q_pelvis_ty, converted to pelvis_ty)")
                 
+                # CRITICAL: Fix left hip adduction sign!
+                # Left hip adduction needs sign flip for correct visualization
+                if 'hip_adduction_l' in ref_data_dict['series_data']:
+                    ref_data_dict['series_data']['hip_adduction_l'] = -ref_data_dict['series_data']['hip_adduction_l']
+                    print(f"   🔄 Applied sign flip to hip_adduction_l (left hip ab/adduction fix)")
+                
             elif 'q_ref' in ref_data_dict and 'joint_names' in ref_data_dict:
                 # Format A: MuJoCo renderer format - needs conversion
                 print("📦 Detected MUJOCO RENDERER format (q_ref, joint_names with q_ prefix)")

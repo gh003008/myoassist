@@ -20,7 +20,7 @@ def render_reference_motion(npz_path, model_path, output_path, num_frames=300, h
     
     print(f'Loading reference: {npz_path}')
     data = np.load(npz_path)
-    q_ref = data['q_ref']
+    q_ref = data['q_ref'].copy()  # Make a copy for modification
     joint_names = data['joint_names']
     
     print(f'  Frames: {q_ref.shape[0]}')
@@ -29,6 +29,19 @@ def render_reference_motion(npz_path, model_path, output_path, num_frames=300, h
     print(f'  Height offset: {height_offset:.3f} m')
     print(f'  FPS: {fps}')
     print(f'  Multiview: {"Yes (Front + Side)" if multiview else "No (Diagonal only)"}')
+    
+    # CRITICAL FIX: Flip sign of left hip adduction (index 10)
+    # Left hip ab/adduction coordinate system requires sign flip
+    if q_ref.shape[1] > 10:  # Make sure we have enough DOFs
+        hip_add_l_idx = None
+        for i, name in enumerate(joint_names):
+            if 'hip_adduction_l' in str(name):
+                hip_add_l_idx = i
+                break
+        
+        if hip_add_l_idx is not None:
+            q_ref[:, hip_add_l_idx] = -q_ref[:, hip_add_l_idx]
+            print(f'  🔄 Applied sign flip to hip_adduction_l (index {hip_add_l_idx})')
     
     # Load MuJoCo model
     print(f'Loading model: {model_path}')
