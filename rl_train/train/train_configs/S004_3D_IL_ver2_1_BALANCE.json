@@ -107,16 +107,16 @@
                 "pelvis_list": 0.5,
                 "pelvis_tilt": 0.5,
                 "pelvis_rotation": 0.5,
-                "hip_flexion_l": 0.5,
-                "hip_flexion_r": 0.5,
-                "hip_adduction_l": 0.3,
-                "hip_adduction_r": 0.3,
-                "hip_rotation_l": 0.2,
-                "hip_rotation_r": 0.2,
-                "knee_angle_l": 0.5,
-                "knee_angle_r": 0.5,
-                "ankle_angle_l": 0.2,
-                "ankle_angle_r": 0.2
+                "hip_flexion_l": 1.0,
+                "hip_flexion_r": 1.0,
+                "hip_adduction_l": 0.6,
+                "hip_adduction_r": 0.6,
+                "hip_rotation_l": 0.4,
+                "hip_rotation_r": 0.4,
+                "knee_angle_l": 1.0,
+                "knee_angle_r": 1.0,
+                "ankle_angle_l": 0.4,
+                "ankle_angle_r": 0.4
             },
             "end_effector_imitation_reward": 0.0,
             "forward_reward": 0.05,
@@ -133,7 +133,12 @@
 
             "_comment_Ver2_1_treadmill": "Treadmill-optimized: low pelvis_tx, high pelvis orientation stability, controlled leg movement",
             "pelvis_list_penalty": 0.5,
-            "pelvis_height_reward": 0.05
+            "pelvis_height_reward": 0.05,
+
+            "_comment_251119_smooth_motion": "Reference-informed velocity constraints + smooth motion rewards",
+            "joint_velocity_constraint": 0.3,
+            "joint_acceleration_penalty": 0.2,
+            "phase_muscle_reward": 0.0
         },
         "custom_max_episode_steps": 1000,
         "prev_trained_policy_path": null,
