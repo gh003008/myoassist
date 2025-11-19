@@ -1,3 +1,8 @@
+# Set matplotlib backend to non-GUI for background rendering
+# This prevents Tcl_AsyncDelete thread errors during training
+import matplotlib
+matplotlib.use('Agg')
+
 from rl_train.utils.train_log_handler import TrainLogHandler
 import os
 import json
