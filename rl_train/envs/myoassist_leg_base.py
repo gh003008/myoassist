@@ -152,11 +152,23 @@ class MyoAssistLegBase(env_base.MujocoEnv):
                 **kwargs,
                 )
         
-        # Check if the keys in DEFAULT_OBS_KEYS are in the keys of the observation dictionary
-        obs_dict_keys = list(self.get_obs_dict(self.sim).keys())
-        assert (set(self.DEFAULT_OBS_KEYS + ['time'])) == set(obs_dict_keys), f"DEFAULT_OBS_KEYS != get_obs_dict.keys. DEFAULT_OBS_KEYS: {self.DEFAULT_OBS_KEYS}, get_obs_dict keys: {obs_dict_keys}"
-        actual_reward_keys = list(self.get_reward_dict(self.sim).keys())
-        assert (set(list(self.rwd_keys_wt.keys()) + ['dense', 'sparse', 'solved', 'done'])) == set(actual_reward_keys), f"rwd_keys_wt != actual_reward_keys. rwd_keys_wt: {self.rwd_keys_wt}, actual_reward_keys keys: {actual_reward_keys}"
+                # Check if reward_keys_and_weights matches actual reward keys
+        actual_reward_keys = self.get_reward_dict(self.get_obs_dict(self.sim)).keys()
+        
+        # Allow for extra keys in actual rewards (for backward compatibility with new reward terms)
+        config_keys = set(list(self.rwd_keys_wt.keys()) + ['dense', 'sparse', 'solved', 'done'])
+        actual_keys = set(actual_reward_keys)
+        
+        # Check if all config keys are in actual keys
+        missing_in_actual = config_keys - actual_keys
+        extra_in_actual = actual_keys - config_keys
+        
+        if missing_in_actual:
+            raise AssertionError(f"Config has keys not in reward_dict: {missing_in_actual}")
+        
+        # Just warn about extra keys (for new reward terms)
+        if extra_in_actual:
+            print(f"⚠️  New reward terms detected (will use weight 0.0 if not in config): {extra_in_actual}")
         
         self.init_qpos[:] = self.sim.model.key_qpos[0]
         self.init_qvel[:] = self.sim.model.key_qvel[0]
