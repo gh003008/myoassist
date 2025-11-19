@@ -9,6 +9,10 @@ from rl_train.envs.environment_handler import EnvironmentHandler
 import subprocess
 from pathlib import Path
 
+# ============ CURRICULUM LEARNING EXTENSION ============
+from rl_train.utils.curriculum_scheduler import CurriculumScheduler, interpolate_reward_weights
+# =======================================================
+
 ################################################################################################################### Rendering
 import os, sys, time, threading
 from collections import deque
@@ -193,6 +197,108 @@ class LiveRenderToggleCallback(BaseCallback):
                     if self.verbose: print(f"[LiveRender] render tick failed: {e}")
         return True
 ################################################################################################################### Rendering
+
+# ============================================================================
+# CURRICULUM LEARNING CALLBACK (EXTENSION)
+# ============================================================================
+class CurriculumLearningCallback(BaseCallback):
+    """
+    Curriculum Learning Callback
+    
+    학습 중 주기적으로 curriculum stage를 체크하고,
+    stage가 변경되면 환경 파라미터와 reward weights를 업데이트합니다.
+    
+    주요 기능:
+    - Stage 전환 자동 감지
+    - 환경 velocity range 동적 변경
+    - Episode length 동적 변경
+    - Reward weights 동적 변경 (config 업데이트)
+    
+    Args:
+        scheduler: CurriculumScheduler 인스턴스
+        check_freq: Stage 체크 주기 (timesteps)
+        verbose: 로그 레벨
+    """
+    def __init__(self, scheduler: CurriculumScheduler, config, check_freq: int = 10000, verbose: int = 1):
+        super().__init__(verbose)
+        self.scheduler = scheduler
+        self.config = config
+        self.check_freq = check_freq
+        self.last_check_timestep = 0
+        
+        # Store original reward weights for interpolation
+        from rl_train.utils.data_types import DictionableDataclass
+        self.base_reward_weights = DictionableDataclass.to_dict(config.env_params.reward_keys_and_weights)
+    
+    def _on_step(self) -> bool:
+        """매 스텝마다 호출되는 콜백"""
+        
+        # Check frequency에 따라 stage 확인
+        if self.num_timesteps - self.last_check_timestep >= self.check_freq:
+            self.last_check_timestep = self.num_timesteps
+            
+            # Update scheduler with elapsed timesteps
+            stage_changed = self.scheduler.update(self.check_freq)
+            
+            if stage_changed:
+                self._apply_new_stage()
+        
+        return True
+    
+    def _apply_new_stage(self):
+        """새로운 curriculum stage 적용"""
+        stage = self.scheduler.get_current_stage()
+        params = self.scheduler.get_current_stage_params()
+        
+        print("\n" + "🎓"*40)
+        print(f"🎓 CURRICULUM STAGE {stage.stage_id}: {stage.name}")
+        print(f"   Timestep: {self.num_timesteps:,}")
+        print("🎓"*40)
+        
+        # 1. Update velocity range
+        if 'target_velocity_range' in params:
+            vel_min, vel_max = params['target_velocity_range']
+            try:
+                # VecEnv method to update all environments
+                self.training_env.env_method('update_velocity_range', vel_min, vel_max)
+                print(f"   ✅ Velocity range updated: {vel_min:.2f} ~ {vel_max:.2f} m/s")
+            except Exception as e:
+                print(f"   ⚠️  Could not update velocity range: {e}")
+        
+        # 2. Update max episode steps
+        if 'max_episode_steps' in params:
+            max_steps = params['max_episode_steps']
+            try:
+                self.training_env.env_method('update_max_episode_steps', max_steps)
+                print(f"   ✅ Max episode steps updated: {max_steps}")
+            except Exception as e:
+                print(f"   ⚠️  Could not update max episode steps: {e}")
+        
+        # 3. Update reward weights
+        if 'reward_weights' in params and params['reward_weights'] is not None:
+            try:
+                # Interpolate between base and stage weights
+                progress = self.scheduler.get_progress()
+                new_weights = interpolate_reward_weights(
+                    self.base_reward_weights,
+                    params['reward_weights'],
+                    progress=1.0  # Immediately apply full stage weights
+                )
+                
+                # Update config (this affects new episodes)
+                self.config.env_params.reward_keys_and_weights.update(new_weights)
+                
+                # Update existing environments
+                self.training_env.env_method('update_reward_weights', new_weights)
+                
+                print(f"   ✅ Reward weights updated ({len(params['reward_weights'])} weights)")
+                for key, value in params['reward_weights'].items():
+                    print(f"      {key}: {value:.3f}")
+            except Exception as e:
+                print(f"   ⚠️  Could not update reward weights: {e}")
+        
+        print("🎓"*40 + "\n")
+# ============================================================================
 
 def get_git_info():
     try:
@@ -384,7 +490,9 @@ def ppo_evaluate_with_rendering(config):
             obs, info = env.reset()
 
     env.close()
-def ppo_train_with_parameters(config, train_time_step, is_rendering_on, train_log_handler, use_ver1_0=False, wandb_config=None, visualize_before_training=True, enable_live_render=True):
+def ppo_train_with_parameters(config, train_time_step, is_rendering_on, train_log_handler, 
+                             use_ver1_0=False, wandb_config=None, visualize_before_training=True,
+                             curriculum_scheduler=None):  # ============ CURRICULUM EXTENSION ============
     seed = 1234
     np.random.seed(seed)
 
@@ -417,8 +525,43 @@ def ppo_train_with_parameters(config, train_time_step, is_rendering_on, train_lo
     with open(os.path.join(log_dir, 'session_config.json'), 'w', encoding='utf-8') as file:
         json.dump(session_config_dict, file, ensure_ascii=False, indent=4)
 
-    custom_callback = EnvironmentHandler.get_callback(config, train_log_handler, use_ver1_0=use_ver1_0, wandb_config=wandb_config, enable_live_render=enable_live_render)
+    # ============ CURRICULUM LEARNING EXTENSION ============
+    # Apply initial curriculum stage if enabled
+    if curriculum_scheduler is not None:
+        initial_stage_params = curriculum_scheduler.get_current_stage_params()
+        if 'target_velocity_range' in initial_stage_params:
+            vel_min, vel_max = initial_stage_params['target_velocity_range']
+            config.env_params.min_target_velocity = vel_min
+            config.env_params.max_target_velocity = vel_max
+            print(f"🎯 Curriculum Stage 1: Velocity set to {vel_min:.2f}~{vel_max:.2f} m/s")
+        
+        if 'max_episode_steps' in initial_stage_params:
+            config.env_params.custom_max_episode_steps = initial_stage_params['max_episode_steps']
+            print(f"🎯 Curriculum Stage 1: Max episode steps = {initial_stage_params['max_episode_steps']}")
+    # =======================================================
 
+    custom_callback = EnvironmentHandler.get_callback(config, train_log_handler, use_ver1_0=use_ver1_0, wandb_config=wandb_config)
+
+    # ============ CURRICULUM LEARNING EXTENSION ============
+    # Add curriculum callback if enabled
+    if curriculum_scheduler is not None:
+        curriculum_callback = CurriculumLearningCallback(
+            scheduler=curriculum_scheduler,
+            config=config,
+            check_freq=10000,  # Check every 10k timesteps
+            verbose=1
+        )
+        
+        # Combine callbacks
+        from stable_baselines3.common.callbacks import CallbackList
+        if isinstance(custom_callback, list):
+            all_callbacks = custom_callback + [curriculum_callback]
+        else:
+            all_callbacks = [custom_callback, curriculum_callback]
+        custom_callback = CallbackList(all_callbacks)
+        
+        print("✅ Curriculum callback added to training pipeline\n")
+    # =======================================================
 
     model.learn(reset_num_timesteps=False, total_timesteps=train_time_step, log_interval=1, callback=custom_callback, progress_bar=True)
     env.close()
@@ -436,11 +579,13 @@ if __name__ == '__main__':
     parser.add_argument("--wandb_project", type=str, default="myoassist-3D-imitation", help="WandB project name (default: myoassist-3D-imitation)")
     parser.add_argument("--wandb_name", type=str, default=None, help="WandB run name (auto-generated if not specified)")
     
-    # Live rendering during training
-    parser.add_argument("--enable_live_render", type=bool, default=True, action=argparse.BooleanOptionalAction, help="Enable keyboard-controlled live rendering during training (default: True, press 'o' to toggle)")
-    
     # Resume training
     parser.add_argument("--resume_from", type=str, default=None, help="Path to previous training session directory to resume from (e.g., rl_train/results/20251118_144143_S004_3D_IL_ver2_1_BALANCE)")
+    
+    # ============ CURRICULUM LEARNING EXTENSION ============
+    parser.add_argument("--enable_curriculum", type=bool, default=False, action=argparse.BooleanOptionalAction, help="Enable curriculum learning (True/False)")
+    parser.add_argument("--curriculum_config", type=str, default="rl_train/train/train_configs/curriculum_treadmill_default.json", help="Path to curriculum config JSON file")
+    # =======================================================
 
     args, unknown_args = parser.parse_known_args()
     if args.config_file_path is None:
@@ -512,6 +657,30 @@ if __name__ == '__main__':
     print(f"\n📁 Session directory: {log_dir}")
     print(f"   All results (videos, models, logs) will be saved here.\n")
     
+    # ============ CURRICULUM LEARNING EXTENSION ============
+    # Initialize Curriculum Scheduler
+    curriculum_scheduler = None
+    if args.enable_curriculum:
+        if os.path.exists(args.curriculum_config):
+            curriculum_scheduler = CurriculumScheduler.from_config(
+                args.curriculum_config,
+                enable=True
+            )
+        else:
+            print(f"⚠️  Curriculum config not found: {args.curriculum_config}")
+            print("   Using default treadmill curriculum")
+            curriculum_scheduler = CurriculumScheduler.create_default_treadmill_curriculum(enable=True)
+        
+        # Save curriculum config to log directory
+        curriculum_save_path = os.path.join(log_dir, "curriculum_config.json")
+        if os.path.exists(args.curriculum_config):
+            import shutil
+            shutil.copy(args.curriculum_config, curriculum_save_path)
+        print(f"📚 Curriculum learning ENABLED - config saved to {curriculum_save_path}\n")
+    else:
+        print("📚 Curriculum learning DISABLED\n")
+    # =======================================================
+    
     # 🎬 Visualization will happen INSIDE ppo_train_with_parameters
     # after environment creation, before training starts
     
@@ -551,5 +720,6 @@ if __name__ == '__main__':
                                 train_log_handler=train_log_handler,
                                 use_ver1_0=use_wandb,  # Pass WandB flag
                                 wandb_config=wandb_config,
-                                enable_live_render=args.enable_live_render)
+                                curriculum_scheduler=curriculum_scheduler)  # ============ CURRICULUM EXTENSION ============
+
     

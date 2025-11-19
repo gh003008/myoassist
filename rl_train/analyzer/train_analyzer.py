@@ -123,14 +123,23 @@ class TrainAnalyzer:
 
             # for cam_type in ["average_speed", "follow"]:
             file_name = f'replay_{eval_idx:02d}.mp4'
-            frames = gait_evaluator.replay(gait_data_path, os.path.join(analyze_result_dir, file_name),
-                                                cam_distance=evaluate_param["cam_distance"],
-                                                # max_time_step=evaluate_param["num_timesteps"],
-                                                use_activation_visualization=evaluate_param["visualize_activation"],
-                                                cam_type=evaluate_param["cam_type"],
-                                                realtime_plotting_info=evaluate_param.get("realtime_plotting_info", []),
-                                                video_fps=config.env_params.control_framerate
-                                                )
+            try:
+                frames = gait_evaluator.replay(gait_data_path, os.path.join(analyze_result_dir, file_name),
+                                                    cam_distance=evaluate_param["cam_distance"],
+                                                    # max_time_step=evaluate_param["num_timesteps"],
+                                                    use_activation_visualization=evaluate_param["visualize_activation"],
+                                                    cam_type=evaluate_param["cam_type"],
+                                                    realtime_plotting_info=evaluate_param.get("realtime_plotting_info", []),
+                                                    video_fps=config.env_params.control_framerate
+                                                    )
+            except (MemoryError, np.core._exceptions._ArrayMemoryError) as e:
+                print(f"⚠️  렌더링 메모리 부족으로 건너뜀: {e}")
+                print(f"   학습은 계속 진행됩니다. 나중에 저장된 모델로 렌더링 가능합니다.")
+                frames = None
+            except Exception as e:
+                print(f"⚠️  렌더링 실패: {e}")
+                print(f"   학습은 계속 진행됩니다.")
+                frames = None
             
             train_analyzer_report_path = os.path.join(analyze_result_dir, "train_analyzer_report.json")
             with open(train_analyzer_report_path, 'w') as f:

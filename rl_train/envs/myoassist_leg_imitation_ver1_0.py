@@ -131,7 +131,12 @@ class ImitationCustomLearningCallback_ver1_0(BaseCustomLearningCallback):
             print(f"\n{'='*60}")
             print(f"🎬 {progress_pct}% 완료 - 중간 평가 및 렌더링 시작")
             print(f"{'='*60}\n")
-            self._evaluate_and_render(progress_pct)
+            try:
+                self._evaluate_and_render(progress_pct)
+            except Exception as e:
+                print(f"\n⚠️  평가/렌더링 실패 - 학습은 계속 진행")
+                print(f"   에러: {type(e).__name__}: {e}")
+                print(f"   (체크포인트는 정상 저장되고 있습니다)\n")
 
         super()._on_step()
             
@@ -160,19 +165,25 @@ class ImitationCustomLearningCallback_ver1_0(BaseCustomLearningCallback):
         
         # 렌더링 환경 생성
         print("🎥 렌더링 환경 생성 중...")
-        eval_env = EnvironmentHandler.create_environment(
-            self._config, 
-            is_rendering_on=True, 
-            is_evaluate_mode=True
-        )
-        
-        # 모델 로드
-        from stable_baselines3 import PPO
-        eval_model = PPO.load(model_path, env=eval_env)
-        
-        # 평가 실행
-        print(f"🏃 평가 시작 ({self._config.evaluate_param_list[0]['num_timesteps']} steps)...")
-        obs, info = eval_env.reset()
+        try:
+            eval_env = EnvironmentHandler.create_environment(
+                self._config, 
+                is_rendering_on=True, 
+                is_evaluate_mode=True
+            )
+            
+            # 모델 로드
+            from stable_baselines3 import PPO
+            eval_model = PPO.load(model_path, env=eval_env)
+            
+            # 평가 실행
+            print(f"🏃 평가 시작 ({self._config.evaluate_param_list[0]['num_timesteps']} steps)...")
+            obs, info = eval_env.reset()
+        except Exception as e:
+            print(f"\n⚠️  렌더링 환경 생성 실패 - 평가 건너뜀 (학습은 계속)")
+            print(f"   에러: {type(e).__name__}: {e}")
+            print(f"   (체크포인트는 정상 저장되었습니다)\n")
+            return  # Skip evaluation, continue training
         episode_rewards = []
         episode_reward = 0
         frames = []
@@ -198,9 +209,10 @@ class ImitationCustomLearningCallback_ver1_0(BaseCustomLearningCallback):
                     frame = eval_env.render()
                     if frame is not None:
                         frames.append(frame)
-                except Exception as e:
-                    if step == 0:
-                        print(f"⚠️ 프레임 캡처 실패: {e}")
+                except (RuntimeError, Exception) as e:
+                    # Tcl_AsyncDelete, memory errors, etc. → disable rendering
+                    if step == 0 or 'Tcl_AsyncDelete' in str(e) or 'memory' in str(e).lower():
+                        print(f"⚠️ 렌더링 에러 (학습은 계속): {type(e).__name__}: {e}")
                         video_enabled = False
             
             if truncated or done:
