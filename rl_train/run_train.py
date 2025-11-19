@@ -384,7 +384,7 @@ def ppo_evaluate_with_rendering(config):
             obs, info = env.reset()
 
     env.close()
-def ppo_train_with_parameters(config, train_time_step, is_rendering_on, train_log_handler, use_ver1_0=False, wandb_config=None, visualize_before_training=True):
+def ppo_train_with_parameters(config, train_time_step, is_rendering_on, train_log_handler, use_ver1_0=False, wandb_config=None, visualize_before_training=True, enable_live_render=True):
     seed = 1234
     np.random.seed(seed)
 
@@ -417,7 +417,7 @@ def ppo_train_with_parameters(config, train_time_step, is_rendering_on, train_lo
     with open(os.path.join(log_dir, 'session_config.json'), 'w', encoding='utf-8') as file:
         json.dump(session_config_dict, file, ensure_ascii=False, indent=4)
 
-    custom_callback = EnvironmentHandler.get_callback(config, train_log_handler, use_ver1_0=use_ver1_0, wandb_config=wandb_config)
+    custom_callback = EnvironmentHandler.get_callback(config, train_log_handler, use_ver1_0=use_ver1_0, wandb_config=wandb_config, enable_live_render=enable_live_render)
 
 
     model.learn(reset_num_timesteps=False, total_timesteps=train_time_step, log_interval=1, callback=custom_callback, progress_bar=True)
@@ -435,6 +435,9 @@ if __name__ == '__main__':
     parser.add_argument("--use_ver1_0", type=bool, default=False, action=argparse.BooleanOptionalAction, help="Use ver1_0 callback with WandB (True/False)")
     parser.add_argument("--wandb_project", type=str, default="myoassist-3D-imitation", help="WandB project name (default: myoassist-3D-imitation)")
     parser.add_argument("--wandb_name", type=str, default=None, help="WandB run name (auto-generated if not specified)")
+    
+    # Live rendering during training
+    parser.add_argument("--enable_live_render", type=bool, default=True, action=argparse.BooleanOptionalAction, help="Enable keyboard-controlled live rendering during training (default: True, press 'o' to toggle)")
     
     # Resume training
     parser.add_argument("--resume_from", type=str, default=None, help="Path to previous training session directory to resume from (e.g., rl_train/results/20251118_144143_S004_3D_IL_ver2_1_BALANCE)")
@@ -547,5 +550,6 @@ if __name__ == '__main__':
                                 is_rendering_on=args.flag_rendering,
                                 train_log_handler=train_log_handler,
                                 use_ver1_0=use_wandb,  # Pass WandB flag
-                                wandb_config=wandb_config)
+                                wandb_config=wandb_config,
+                                enable_live_render=args.enable_live_render)
     

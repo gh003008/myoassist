@@ -227,23 +227,25 @@ class EnvironmentHandler:
         return session_config
 
     @staticmethod
-    def get_callback(config, train_log_handler, use_ver1_0=False, wandb_config=None):
+    def get_callback(config, train_log_handler, use_ver1_0=False, wandb_config=None, enable_live_render=True):
         """
         Get callback for training
         
         Args:
             use_ver1_0: If True, use ver1_0 callback with WandB integration
             wandb_config: WandB configuration dict (only used if use_ver1_0=True)
+            enable_live_render: If True, add LiveRenderToggleCallback for keyboard control
         """
         from rl_train.train.train_configs.config_imitation import ImitationTrainSessionConfig
-        
         from rl_train.utils import learning_callback
+        from stable_baselines3.common.callbacks import CallbackList
         
+        # Main training callback
         if isinstance(config, ImitationTrainSessionConfig):
             if use_ver1_0:
                 # ver1_0: Use enhanced callback with WandB
                 from rl_train.envs.myoassist_leg_imitation_ver1_0 import ImitationCustomLearningCallback_ver1_0
-                custom_callback = ImitationCustomLearningCallback_ver1_0(
+                main_callback = ImitationCustomLearningCallback_ver1_0(
                     log_rollout_freq=config.logger_params.logging_frequency,
                     evaluate_freq=config.logger_params.evaluate_frequency,
                     log_handler=train_log_handler,
@@ -252,11 +254,11 @@ class EnvironmentHandler:
                     config=config,
                     wandb_config=wandb_config,
                 )
-                print("✅ Using ver1_0 callback (WandB + 10% evaluation + 1% early video)")
+                print("✅ Using ver1_0 callback (WandB + 10% evaluation)")
             else:
                 # Original callback
                 from rl_train.envs import myoassist_leg_imitation
-                custom_callback = myoassist_leg_imitation.ImitationCustomLearningCallback(
+                main_callback = myoassist_leg_imitation.ImitationCustomLearningCallback(
                     log_rollout_freq=config.logger_params.logging_frequency,
                     evaluate_freq=config.logger_params.evaluate_frequency,
                     log_handler=train_log_handler,
@@ -265,14 +267,26 @@ class EnvironmentHandler:
                     total_timesteps=config.total_timesteps,  # For 1% progress video
                 )
         else:
-            custom_callback = learning_callback.BaseCustomLearningCallback(
+            main_callback = learning_callback.BaseCustomLearningCallback(
                 log_rollout_freq=config.logger_params.logging_frequency,
                 evaluate_freq=config.logger_params.evaluate_frequency,
                 log_handler=train_log_handler,
                 total_timesteps=config.total_timesteps,  # For 1% progress video
             )
-
-        return custom_callback
+        
+        # Add LiveRenderToggleCallback if enabled
+        if enable_live_render:
+            from rl_train.run_train import LiveRenderToggleCallback
+            live_render_callback = LiveRenderToggleCallback(
+                num_envs=config.env_params.num_envs,
+                start_index=0,
+                render_every_n_steps=1,  # 매 step마다 렌더링 (창 열렸을 때만)
+                verbose=1
+            )
+            print("✅ Live rendering enabled (press 'o' to toggle, 'v' to pause, 'm/n' to switch env)")
+            return CallbackList([main_callback, live_render_callback])
+        else:
+            return main_callback
     @staticmethod
     def get_stable_baselines3_model(config:TrainSessionConfigBase, env, trained_model_path:str|None=None):
         import stable_baselines3

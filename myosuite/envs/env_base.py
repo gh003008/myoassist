@@ -672,6 +672,36 @@ class MujocoEnv(gym.Env, gym.utils.EzPickle, ObsVecDict):
         """
         self.sim.renderer.render_to_window()
 
+    
+    def render_live(self, paused=False):
+        """
+        Render live during training (called from LiveRenderToggleCallback)
+        Thread-safe: always called from main training thread
+        
+        Args:
+            paused: If True, window stays open but doesn't update
+        """
+        try:
+            if not paused:
+                # Update rendering (메인 스레드에서만 호출되므로 안전)
+                self.mj_render()
+        except Exception as e:
+            # 렌더링 실패해도 학습 중단 X
+            print(f"⚠️ render_live failed: {e}")
+    
+    
+    def close_live_view(self):
+        """
+        Close live rendering window
+        Thread-safe: always called from main training thread
+        """
+        try:
+            if hasattr(self.sim.renderer, '_window') and self.sim.renderer._window:
+                self.sim.renderer._window.close()
+                self.sim.renderer._window = None
+        except Exception as e:
+            print(f"⚠️ close_live_view failed: {e}")
+
 
     def viewer_setup(self, distance=2.5, azimuth=90, elevation=-30, lookat=None, render_actuator=None, render_tendon=None):
         """
