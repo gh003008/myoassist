@@ -89,6 +89,7 @@ class ImitationCustomLearningCallback_ver3_0(BaseCallback):
                  auto_reward_adjust_params: ImitationTrainSessionConfig.AutoRewardAdjustParams,
                  config: ImitationTrainSessionConfig,
                  wandb_config: dict = None,
+                 enable_balance_reward: bool = False,
                  verbose=1):
         """
         Args:
@@ -98,6 +99,7 @@ class ImitationCustomLearningCallback_ver3_0(BaseCallback):
             original_reward_weights: Reward weights for imitation
             auto_reward_adjust_params: Auto reward adjustment parameters
             config: Complete training configuration
+            enable_balance_reward: Whether to enable balance reward (Ver 3.0 feature)
             wandb_config: WandB configuration dict (from ver1_0)
             verbose: Verbosity level
         """
@@ -113,6 +115,9 @@ class ImitationCustomLearningCallback_ver3_0(BaseCallback):
         self._reward_weights = original_reward_weights
         self._auto_reward_adjust_params = auto_reward_adjust_params
         self._config = config
+        
+        # Ver 3.0 feature
+        self._enable_balance_reward = enable_balance_reward
         
         # From ver1_0: WandB & Evaluation
         self._wandb_config = wandb_config or {}
@@ -414,9 +419,9 @@ class ImitationCustomLearningCallback_ver3_0(BaseCallback):
 
         # Create log data (from BaseCustomLearningCallback structure)
         log_data = ImitationTrainCheckpointData(
-            timesteps=self.num_timesteps,
-            episode_reward_mean=float(mean_reward),
-            episode_length_mean=float(mean_ep_length),
+            num_timesteps=self.num_timesteps,
+            average_reward_per_episode=float(mean_reward),
+            average_num_timestep=float(mean_ep_length),
             reward_weights=DictionableDataclass.to_dict(self._reward_weights),
             reward_accumulate=self.reward_accumulate.copy(),
         )
@@ -571,6 +576,13 @@ class MyoAssistLegImitation_ver3_0(MyoAssistLegBase):
             'qvel_imitation_rewards': qvel_imitation_rewards,
             'end_effector_imitation_reward': anchor_reward
         })
+        
+        # Add balance rewards if in config (Ver 3.0 feature)
+        # Check if balance rewards are in the config
+        if hasattr(self._reward_keys_and_weights, 'pelvis_list_penalty'):
+            base_reward['pelvis_list_penalty'] = 0.0  # TODO: Implement
+        if hasattr(self._reward_keys_and_weights, 'pelvis_height_reward'):
+            base_reward['pelvis_height_reward'] = 0.0  # TODO: Implement
 
         return base_reward, base_info
 
@@ -673,7 +685,7 @@ class MyoAssistLegImitation_ver3_0(MyoAssistLegBase):
             raise ValueError("Reference data is not set")
 
     def reset(self, **kwargs):
-        """Override environment reset"""
+        """Override environment reset - with fixed arm pose"""
         rng = np.random.default_rng()
         
         # Random or fixed start index
@@ -692,6 +704,30 @@ class MyoAssistLegImitation_ver3_0(MyoAssistLegBase):
             reset_qvel=self.sim.data.qvel, 
             **kwargs
         )
+        
+        # Fix arms to natural hanging pose (arms relaxed at sides)
+        # shoulder_flex: 0 = neutral, positive = forward
+        # shoulder_abd: 0 = neutral, positive = abduction (away from body)
+        # elbow_flex: 0 = straight, positive = bent
+        arm_pose = {
+            'r_shoulder_flex': 0.0,   # Neutral, arms at sides
+            'r_shoulder_abd': 0.1,    # Slightly away from body
+            'r_shoulder_rot': 0.0,    # Neutral rotation
+            'r_elbow_flex': 0.1,      # Nearly straight
+            'l_shoulder_flex': 0.0,
+            'l_shoulder_abd': -0.1,   # Slightly away (opposite sign for left)
+            'l_shoulder_rot': 0.0,
+            'l_elbow_flex': 0.1,
+        }
+        
+        for joint_name, angle in arm_pose.items():
+            try:
+                self.sim.data.joint(joint_name).qpos[0] = angle
+                self.sim.data.joint(joint_name).qvel[0] = 0.0
+            except:
+                pass  # Joint may not exist in some models
+        
+        self.sim.forward()  # Update physics state with fixed arms
         return obs
 
     def _initialize_pose(self):

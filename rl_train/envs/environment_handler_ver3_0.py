@@ -14,7 +14,7 @@ Changes from original environment_handler.py:
 Created: 2024
 """
 
-import gym
+import gymnasium as gym
 import numpy as np
 import os
 import json
@@ -22,7 +22,7 @@ import warnings
 
 from myosuite.utils.quat_math import quat2mat, mat2quat, euler2quat
 from rl_train.train.train_configs.config import TrainSessionConfigBase
-from myosuite.utils.dictionable_dataclass import DictionableDataclass
+from rl_train.utils.data_types import DictionableDataclass
 
 
 class EnvironmentHandler:
@@ -42,32 +42,49 @@ class EnvironmentHandler:
         """
         from rl_train.train.train_configs.config_imitation import ImitationTrainSessionConfig
 
-        if isinstance(config, ImitationTrainSessionConfig):
-            # Ver 3.0: Always use ver3_0 environment
-            from rl_train.envs.myoassist_leg_imitation_ver3_0 import MyoAssistLegImitation_ver3_0
-            
-            ref_data_dict = None
-            if load_reference_data:
-                ref_data_dict = EnvironmentHandler.load_reference_data(config)
+        # Load reference data if needed
+        ref_data_dict = None
+        if load_reference_data:
+            ref_data_dict = EnvironmentHandler.load_reference_data(config)
 
-            # Create Ver 3.0 environment with balance reward option
-            env = MyoAssistLegImitation_ver3_0(
-                **DictionableDataclass.to_dict(config.env_params),
-                ref_data=ref_data_dict,
-                enable_balance_reward=enable_balance_reward,  # Ver 3.0 feature
-            )
+        # Prepare gym.make arguments
+        gym_make_args = {
+            'seed': config.env_params.seed,
+            'model_path': config.env_params.model_path,
+            'env_params': config.env_params,
+            'is_evaluate_mode': False
+        }
+        
+        # Add reference data if it exists
+        if ref_data_dict is not None:
+            gym_make_args['reference_data'] = ref_data_dict
+        
+        # Add Ver 3.0 specific args
+        if isinstance(config, ImitationTrainSessionConfig):
+            gym_make_args['enable_balance_reward'] = enable_balance_reward
+        
+        # Create environment using gym.make (supports both VecEnv and single env)
+        try:
+            from stable_baselines3.common.vec_env import SubprocVecEnv
+            
+            if config.env_params.num_envs == 1:
+                env = gym.make(config.env_params.env_id, **gym_make_args).unwrapped
+                config.ppo_params.n_steps = config.ppo_params.batch_size
+            else:
+                env = SubprocVecEnv([
+                    lambda: gym.make(config.env_params.env_id, **gym_make_args).unwrapped 
+                    for _ in range(config.env_params.num_envs)
+                ])
+            
             print("✅ Created Ver 3.0 environment (simplified callback system)")
             if enable_balance_reward:
                 print("   🎯 Balance reward ENABLED (Ver 3.0 feature)")
             
             return env
-        else:
-            # Create base environment
-            env = gym.make(
-                config.env_params.env_id,
-                **DictionableDataclass.to_dict(config.env_params),
-            )
-            return env
+        except Exception as e:
+            new_message = str(e)[:1000]
+            e.args = (new_message,)
+            raise e
 
     @staticmethod
     def load_reference_data(config: TrainSessionConfigBase):
@@ -102,6 +119,27 @@ class EnvironmentHandler:
             if 'series_data' in ref_data_dict and 'metadata' in ref_data_dict:
                 # Format B: Environment format - already correct
                 print("📦 Detected ENVIRONMENT format (series_data, metadata)")
+                
+                # CRITICAL: Remove q_ prefix from environment format keys!
+                # Some environment format files still have q_ prefix in keys
+                series_data = ref_data_dict['series_data']
+                first_key = list(series_data.keys())[0]
+                
+                if first_key.startswith('q_') or first_key.startswith('dq_'):
+                    print("   ⚠️  Detected q_ prefix in environment format keys - removing...")
+                    new_series_data = {}
+                    for key, value in series_data.items():
+                        if key.startswith('q_'):
+                            new_key = key[2:]  # Remove 'q_'
+                        elif key.startswith('dq_'):
+                            new_key = 'd' + key[3:]  # 'dq_pelvis_tx' → 'dpelvis_tx'
+                        else:
+                            new_key = key
+                        new_series_data[new_key] = value
+                    ref_data_dict['series_data'] = new_series_data
+                    print(f"   ✅ Removed q_ prefix from {len(new_series_data)} keys")
+                else:
+                    print("   NO prefix removal needed - keys already clean!")
                 
                 # CRITICAL: Apply pelvis_ty offset for environment format!
                 # Environment format NPZ has ground-relative pelvis_ty

@@ -55,9 +55,9 @@ register_env_myoassist(id='myoAssistLegImitationExo-v0',
         kwargs={},
     )
 
-# 251117_Ver2_1: Ver2_0 Karico + 3D balancing rewards
+# 251119_Ver3_0: Simplified ALL-IN-ONE architecture (replaces ver2_1)
 register_env_myoassist(id='myoAssistLegImitationExo-v2_1',
-        entry_point='rl_train.envs.myoassist_leg_imitation_ver2_1:MyoAssistLegImitation_ver2_1',
+        entry_point='rl_train.envs.myoassist_leg_imitation_ver3_0:MyoAssistLegImitation_ver3_0',
         max_episode_steps=1000,
         kwargs={},
     )
