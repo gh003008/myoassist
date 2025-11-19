@@ -137,9 +137,9 @@
             "pelvis_list_penalty": 0.4,
             "pelvis_height_reward": 0.1,
 
-            "_comment_smooth_motion": "DeepMimic-style velocity/acceleration constraints",
-            "joint_velocity_constraint": 0.3,
-            "joint_acceleration_penalty": 0.2,
+            "_comment_smooth_motion": "DeepMimic-style velocity/acceleration constraints (keep original values as control variables)",
+            "joint_velocity_constraint": 0.5,
+            "joint_acceleration_penalty": 0.3,
             "phase_muscle_reward": 0.05
         },
         "custom_max_episode_steps": 1000,
