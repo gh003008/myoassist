@@ -355,10 +355,37 @@ class MyoAssistLegImitation_ver2_1(MyoAssistLegImitation):
         return result
     
     def reset(self, **kwargs):
-        """251119_Update: Reset step count + velocity history"""
+        """251119_Update: Reset step count + velocity history + fix arm pose"""
         self._step_count = 0
         self._prev_qvel = None  # Reset velocity history for acceleration calculation
-        return super().reset(**kwargs)
+        
+        # Apply reference pose first
+        obs = super().reset(**kwargs)
+        
+        # Fix arms to natural hanging pose (arms relaxed at sides)
+        # shoulder_flex: 0 = neutral, positive = forward
+        # shoulder_abd: 0 = neutral, positive = abduction (away from body)
+        # elbow_flex: 0 = straight, positive = bent
+        arm_pose = {
+            'r_shoulder_flex': 0.0,   # Neutral, arms at sides
+            'r_shoulder_abd': 0.1,    # Slightly away from body
+            'r_shoulder_rot': 0.0,    # Neutral rotation
+            'r_elbow_flex': 0.1,      # Nearly straight
+            'l_shoulder_flex': 0.0,
+            'l_shoulder_abd': -0.1,   # Slightly away (opposite sign for left)
+            'l_shoulder_rot': 0.0,
+            'l_elbow_flex': 0.1,
+        }
+        
+        for joint_name, angle in arm_pose.items():
+            try:
+                self.sim.data.joint(joint_name).qpos[0] = angle
+                self.sim.data.joint(joint_name).qvel[0] = 0.0
+            except:
+                pass  # Joint may not exist in some models
+        
+        self.sim.forward()  # Update physics state with fixed arms
+        return obs
     
     def _get_qvel_diff(self):
         """
