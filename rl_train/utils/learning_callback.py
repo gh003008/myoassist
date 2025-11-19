@@ -178,7 +178,13 @@ class BaseCustomLearningCallback(BaseCallback):
             # Create new pool each time to prevent memory leaks
 
             # For debug - disable multiprocessing to avoid reference data loading issues:
-            _analyze_process(self.train_log_handler.log_dir)
+            try:
+                _analyze_process(self.train_log_handler.log_dir)
+            except Exception as e:
+                # Catch any rendering/evaluation errors (e.g., Tcl_AsyncDelete thread issues)
+                # and continue training without interruption
+                print(f"\n⚠️  Evaluation failed but training continues: {type(e).__name__}: {e}")
+                print(f"   (This is non-critical - checkpoints are still saved)\n")
             
             # pool = Pool(processes=1)
             # try:
