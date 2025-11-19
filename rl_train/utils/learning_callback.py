@@ -7,6 +7,7 @@ from rl_train.utils.train_checkpoint_data import TrainCheckpointData
 import multiprocessing
 from multiprocessing import Pool
 import functools
+import os
 
 def _analyze_process(log_dir):
     """
@@ -106,9 +107,12 @@ class BaseCustomLearningCallback(BaseCallback):
                 
                 # Run evaluation video (no model saving needed)
                 try:
-                    _analyze_process(self.train_log_handler.log_dir)
-                    print(f"✅ Early training video saved successfully!")
-                    print("="*80 + "\n")
+                    if os.environ.get('SKIP_ANALYSIS', '0') == '1':
+                        print("⚠️  SKIP_ANALYSIS=1 set - skipping 1% video/analysis.")
+                    else:
+                        _analyze_process(self.train_log_handler.log_dir)
+                        print(f"✅ Early training video saved successfully!")
+                        print("="*80 + "\n")
                 except Exception as e:
                     print(f"⚠️  Failed to save 1% video: {e}")
                     print("   (This won't affect training, videos will still be saved at 10% intervals)")
@@ -178,7 +182,10 @@ class BaseCustomLearningCallback(BaseCallback):
             # Create new pool each time to prevent memory leaks
 
             # For debug - disable multiprocessing to avoid reference data loading issues:
-            _analyze_process(self.train_log_handler.log_dir)
+            if os.environ.get('SKIP_ANALYSIS', '0') == '1':
+                print("⚠️  SKIP_ANALYSIS=1 set - skipping evaluation analysis/rendering.")
+            else:
+                _analyze_process(self.train_log_handler.log_dir)
             
             # pool = Pool(processes=1)
             # try:

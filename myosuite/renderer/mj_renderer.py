@@ -30,6 +30,8 @@ class MJRenderer(Renderer):
         super().__init__(sim)
         self._window = None
         self._renderer = None
+        # Flag to indicate renderer availability (set to False if initialization fails)
+        self._renderer_available = True
         self._paused = False
         self._user_exit = False
 
@@ -45,9 +47,21 @@ class MJRenderer(Renderer):
 
 
     def setup_renderer(self, model, height, width):
-        self._renderer = mujoco.Renderer(model, height=height, width=width)
-        self._scene_option = mujoco.MjvOption()
-        self._update_renderer_settings(self._scene_option)
+        """Create the mujoco.Renderer. If creation fails (headless server),
+        catch the exception and mark renderer as unavailable so caller can
+        continue without crashing.
+        """
+        try:
+            self._renderer = mujoco.Renderer(model, height=height, width=width)
+            self._scene_option = mujoco.MjvOption()
+            self._update_renderer_settings(self._scene_option)
+            self._renderer_available = True
+        except Exception as e:
+            # Don't raise - rendering is optional for training. Log and disable.
+            print(f"⚠️  Renderer initialization failed: {type(e).__name__}: {e}")
+            self._renderer = None
+            self._scene_option = None
+            self._renderer_available = False
 
 
     def render_to_window(self):
@@ -104,22 +118,47 @@ class MJRenderer(Renderer):
         if camera_id == None:
             camera_id = -1
         if self._renderer is None:
+            # attempt to initialize; if it fails, setup_renderer will mark availability
             self.setup_renderer(self._sim.model.ptr, width=width, height=height)
+
+        # If renderer couldn't be initialized, return None(s) gracefully
+        if not self._renderer_available:
+            print("⚠️  Offscreen rendering not available on this system (skipping render).")
+            if depth and segmentation:
+                return None, None, None
+            elif depth:
+                return None, None
+            elif segmentation:
+                return None, None
+            else:
+                return None
 
         rgb_arr = None; dpt_arr = None; seg_arr = None
         if rgb:
-            self._renderer.update_scene(self._sim.data.ptr, camera=camera_id, scene_option=self._scene_option)
-            rgb_arr = self._renderer.render()
+            try:
+                self._renderer.update_scene(self._sim.data.ptr, camera=camera_id, scene_option=self._scene_option)
+                rgb_arr = self._renderer.render()
+            except Exception as e:
+                print(f"⚠️  Offscreen RGB render failed: {type(e).__name__}: {e}")
+                rgb_arr = None
         if depth:
-            self._renderer.enable_depth_rendering()
-            self._renderer.update_scene(self._sim.data.ptr, camera=camera_id, scene_option=self._scene_option)
-            dpt_arr = self._renderer.render()
-            self._renderer.disable_depth_rendering()
+            try:
+                self._renderer.enable_depth_rendering()
+                self._renderer.update_scene(self._sim.data.ptr, camera=camera_id, scene_option=self._scene_option)
+                dpt_arr = self._renderer.render()
+                self._renderer.disable_depth_rendering()
+            except Exception as e:
+                print(f"⚠️  Offscreen depth render failed: {type(e).__name__}: {e}")
+                dpt_arr = None
         if segmentation:
-            self._renderer.enable_segmentation_rendering()
-            self._renderer.update_scene(self._sim.data.ptr, camera=camera_id, scene_option=self._scene_option)
-            seg_arr = self._renderer.render()
-            self._renderer.disable_segmentation_rendering()
+            try:
+                self._renderer.enable_segmentation_rendering()
+                self._renderer.update_scene(self._sim.data.ptr, camera=camera_id, scene_option=self._scene_option)
+                seg_arr = self._renderer.render()
+                self._renderer.disable_segmentation_rendering()
+            except Exception as e:
+                print(f"⚠️  Offscreen segmentation render failed: {type(e).__name__}: {e}")
+                seg_arr = None
 
         if depth and segmentation:
             return rgb_arr, dpt_arr, seg_arr
@@ -156,3 +195,10 @@ class MJRenderer(Renderer):
             self._window.close()
             self._window = None
             quit()
+        # If a renderer object exists, try to clean it up gracefully
+        if getattr(self, '_renderer', None) is not None:
+            try:
+                # Some mujoco bindings may provide a destructor/close; attempt to delete
+                del self._renderer
+            except Exception:
+                pass

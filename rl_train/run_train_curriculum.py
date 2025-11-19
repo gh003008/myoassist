@@ -227,7 +227,8 @@ class CurriculumLearningCallback(BaseCallback):
         self.last_check_timestep = 0
         
         # Store original reward weights for interpolation
-        self.base_reward_weights = dict(config.env_params.reward_keys_and_weights)
+        from rl_train.utils.data_types import DictionableDataclass
+        self.base_reward_weights = DictionableDataclass.to_dict(config.env_params.reward_keys_and_weights)
     
     def _on_step(self) -> bool:
         """매 스텝마다 호출되는 콜백"""

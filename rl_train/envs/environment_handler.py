@@ -251,7 +251,6 @@ class EnvironmentHandler:
                     auto_reward_adjust_params=config.auto_reward_adjust_params,
                     config=config,
                     wandb_config=wandb_config,
-                    total_timesteps=config.total_timesteps,  # For 1% progress video
                 )
                 print("✅ Using ver1_0 callback (WandB + 10% evaluation + 1% early video)")
             else:
